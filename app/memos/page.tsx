@@ -275,7 +275,7 @@ export default function MemoPage() {
     };
 
     return (
-        <div className='min-h-screen p-6 relative'>
+        <div className='min-h-screen p-6 pt-24 relative'>
             <Background />
             <div className='max-w-md mx-auto space-y-6'>
                 <header className='flex flex-col gap-4'>
@@ -327,7 +327,7 @@ export default function MemoPage() {
                             <div className='mb-4 flex justify-center'>
                                 <Calendar className='w-12 h-12 opacity-10' />
                             </div>
-                            <p className='text-sm'>{searchQuery || dateFilter ? "검색된 기억이 없습니다." : "작성된 기억이 없습니다."}</p>
+                            <p className='text-sm'>{searchQuery || dateFilter ? "검색 결과가 없습니다" : "작성된 기록이 없습니다"}</p>
                         </div>
                     ) : (
                         <>

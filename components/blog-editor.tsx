@@ -83,6 +83,18 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
         const wasStandard = isEditing && initialData?.mode === "standard";
         const willAnalyze = mode === "consultation" && (!isEditing || updateAi || wasStandard);
 
+        // [STRICT CHECK] 저장 전에 최신 사용량을 서버에서 강제로 다시 확인합니다.
+        // 프론트엔드 상태가 꼬여서 저장이 되어버리는 것을 방지하기 위함입니다.
+        if (willAnalyze && !isSubscribed) {
+            await useUsageStore.getState().refreshUsage(); // 강제 리프레시
+            const currentCount = useUsageStore.getState().count;
+
+            if (currentCount >= MAX_FREE_CONSULTATIONS) {
+                setShowSubscription(true);
+                return; // 저장 로직 자체를 중단합니다.
+            }
+        }
+
         if (willAnalyze && !isSubscribed && count >= MAX_FREE_CONSULTATIONS) {
             setShowSubscription(true);
             return;
@@ -120,6 +132,10 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
 
                         if (aiRes.ok) {
                             if (!isSubscribed) increment();
+                        } else if (aiRes.status === 403) {
+                            // Quota exceeded
+                            toast.error("일일 무료 상담 횟수를 모두 사용했습니다.");
+                            setShowSubscription(true);
                         } else {
                             toast.error("AI 분석 중 문제가 발생했습니다.");
                         }
@@ -148,7 +164,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     };
 
     return (
-        <div className='min-h-screen p-6 relative'>
+        <div className='min-h-screen p-6 pt-24 relative'>
             <Background />
             <div className='max-w-4xl mx-auto space-y-6 pb-20'>
                 <header className='flex items-center justify-between'>

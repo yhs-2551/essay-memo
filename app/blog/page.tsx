@@ -227,7 +227,7 @@ export default function BlogListPage() {
     const dateOptions = useMemo(() => getAvailableDates(posts), [posts]);
 
     return (
-        <div className='min-h-screen p-6 relative'>
+        <div className='min-h-screen p-6 pt-24 relative'>
             <Background />
             <div className='max-w-4xl mx-auto space-y-6'>
                 <header className='flex flex-col gap-8'>
@@ -324,7 +324,7 @@ export default function BlogListPage() {
                                     <div className='text-center text-muted-foreground/50 py-20'>
                                         <Search className='w-16 h-16 mx-auto mb-6 opacity-10' />
                                         <p className='text-sm font-medium'>
-                                            {searchQuery || dateFilter ? "검색 결과가 없습니다" : "아직 작성된 기록이 없습니다"}
+                                            {searchQuery || dateFilter ? "검색 결과가 없습니다" : "작성된 기록이 없습니다"}
                                         </p>
                                     </div>
                                 )}
