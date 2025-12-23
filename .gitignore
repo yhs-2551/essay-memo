@@ -33,3 +33,6 @@ pnpm-debug.log*
 
 # npm
 .npmrc
+
+# txt
+next.txt

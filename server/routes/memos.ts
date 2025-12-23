@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createClient } from "@/lib/supabase/server";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { logActivity } from "@/lib/logger";
 
 const app = new Hono();
 
@@ -46,6 +47,9 @@ app.post(
         const { data, error } = await (supabase.from("memos") as any).insert({ content }).select().single();
 
         if (error) return c.json({ error: error.message }, 500);
+
+        await logActivity("MEMO_CREATE", { memoId: data.id });
+
         return c.json(data);
     }
 );
@@ -76,6 +80,9 @@ app.delete("/:id", async (c) => {
     const { error } = await supabase.from("memos").delete().eq("id", id);
 
     if (error) return c.json({ error: error.message }, 500);
+
+    await logActivity("MEMO_DELETE", { memoId: id }); // No explicit user_id needed as logger will fetch from session
+
     return c.json({ success: true });
 });
 
@@ -85,6 +92,9 @@ app.post("/bulk-delete", zValidator("json", z.object({ ids: z.array(z.string().u
     const { error } = await supabase.from("memos").delete().in("id", ids);
 
     if (error) return c.json({ error: error.message }, 500);
+
+    await logActivity("MEMO_DELETE", { count: ids.length, bulk: true });
+
     return c.json({ success: true });
 });
 

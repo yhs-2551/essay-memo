@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createClient } from "@/lib/supabase/server";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { logActivity } from "@/lib/logger";
 
 const app = new Hono();
 
@@ -72,20 +73,20 @@ app.post(
             apiKey: process.env.GROQ_API_KEY || "dummy",
         });
 
+        // 3. 이미지 URL 추출 (Markdown 형식 기준) & 모델 결정
+        const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
+        const matches = Array.from(post.content.matchAll(imageRegex)) as RegExpExecArray[];
+        const imageUrls = matches.map((m) => m[2]);
+        const textContent = post.content.replace(imageRegex, "").trim();
+
+        const isVision = imageUrls.length > 0;
+        // 이미지 유무에 따른 모델 스위칭 (Llama 4 Maverick vs Qwen 3)
+        const model = isVision ? "meta-llama/llama-4-maverick-17b-128e-instruct" : "qwen/qwen3-32b";
+
         let aiResponseText = "";
 
         try {
             if (!process.env.GROQ_API_KEY) throw new Error("Missing GROQ_API_KEY");
-
-            // 3. 이미지 URL 추출 (Markdown 형식 기준)
-            const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
-            const matches = Array.from(post.content.matchAll(imageRegex)) as RegExpExecArray[];
-            const imageUrls = matches.map((m) => m[2]);
-            const textContent = post.content.replace(imageRegex, "").trim();
-
-            const isVision = imageUrls.length > 0;
-            // 이미지 유무에 따른 모델 스위칭 (Llama 4 Maverick vs Qwen 3)
-            const model = isVision ? "meta-llama/llama-4-maverick-17b-128e-instruct" : "qwen/qwen3-32b";
 
             const userContent: any[] = [
                 {
@@ -186,6 +187,8 @@ app.post(
             .single();
 
         if (saveError) return c.json({ error: saveError.message }, 500);
+
+        await logActivity("AI_ANALYSIS", { postId, model }, user.id);
 
         return c.json(consultation);
     }

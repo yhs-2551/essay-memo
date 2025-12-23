@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createClient } from "@/lib/supabase/server";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { logActivity } from "@/lib/logger";
 
 const app = new Hono();
 
@@ -64,6 +65,9 @@ app.post(
         const { data, error } = await (supabase.from("posts") as any).insert({ title, content, mode, is_published }).select().single();
 
         if (error) return c.json({ error: error.message }, 500);
+
+        await logActivity("POST_CREATE", { postId: data.id, mode }, data.user_id);
+
         return c.json(data);
     }
 );
@@ -87,6 +91,9 @@ app.patch(
         const { data, error } = await (supabase.from("posts") as any).update(body).eq("id", id).select().single();
 
         if (error) return c.json({ error: error.message }, 500);
+
+        await logActivity("POST_UPDATE", { postId: id, changedFields: Object.keys(body) });
+
         return c.json(data);
     }
 );
@@ -97,6 +104,9 @@ app.delete("/:id", async (c) => {
     const { error } = await supabase.from("posts").delete().eq("id", id);
 
     if (error) return c.json({ error: error.message }, 500);
+
+    await logActivity("POST_DELETE", { postId: id });
+
     return c.json({ success: true });
 });
 
@@ -106,6 +116,9 @@ app.post("/bulk-delete", zValidator("json", z.object({ ids: z.array(z.string().u
     const { error } = await supabase.from("posts").delete().in("id", ids);
 
     if (error) return c.json({ error: error.message }, 500);
+
+    await logActivity("POST_DELETE", { count: ids.length, bulk: true });
+
     return c.json({ success: true });
 });
 
