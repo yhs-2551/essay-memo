@@ -9,6 +9,8 @@ export interface Database {
                     email: string;
                     consultation_count: number;
                     last_consultation_date: string | null;
+                    subscription_tier: string;
+                    preferences: Json;
                     created_at: string;
                     updated_at: string;
                 };
@@ -17,6 +19,8 @@ export interface Database {
                     email: string;
                     consultation_count?: number;
                     last_consultation_date?: string | null;
+                    subscription_tier?: string;
+                    preferences?: Json;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -25,6 +29,8 @@ export interface Database {
                     email?: string;
                     consultation_count?: number;
                     last_consultation_date?: string | null;
+                    subscription_tier?: string;
+                    preferences?: Json;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -89,6 +95,7 @@ export interface Database {
                     content: string;
                     mode: "standard" | "consultation";
                     is_published: boolean;
+                    images: Json;
                     created_at: string;
                     updated_at: string;
                 };
@@ -99,6 +106,7 @@ export interface Database {
                     content: string;
                     mode?: "standard" | "consultation";
                     is_published?: boolean;
+                    images?: Json;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -109,6 +117,7 @@ export interface Database {
                     content?: string;
                     mode?: "standard" | "consultation";
                     is_published?: boolean;
+                    images?: Json;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -119,6 +128,7 @@ export interface Database {
                     user_id: string;
                     post_id: string;
                     analysis: string;
+                    analysis_data: Json | null;
                     created_at: string;
                 };
                 Insert: {
@@ -126,6 +136,7 @@ export interface Database {
                     user_id: string;
                     post_id: string;
                     analysis: string;
+                    analysis_data?: Json | null;
                     created_at?: string;
                 };
                 Update: {
@@ -133,6 +144,7 @@ export interface Database {
                     user_id?: string;
                     post_id?: string;
                     analysis?: string;
+                    analysis_data?: Json | null;
                     created_at?: string;
                 };
             };

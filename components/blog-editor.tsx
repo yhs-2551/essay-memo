@@ -102,20 +102,24 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
 
         setLoading(true);
         try {
-            const finalContent = uploadedImages.length > 0 ? `${content}\n\n${uploadedImages.map((url) => `![이미지](${url})`).join("\n")}` : content;
+            // [CHANGED] Images are now sent separately, not embedded in markdown
+            const finalContent = content;
 
             const url = isEditing ? `/api/posts/${initialData?.id}` : "/api/posts";
             const method = isEditing ? "PATCH" : "POST";
 
+            const payload = {
+                title,
+                content: finalContent,
+                mode,
+                is_published: true,
+                images: uploadedImages, // Send detached images
+            };
+
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title,
-                    content: finalContent,
-                    mode,
-                    is_published: true,
-                }),
+                body: JSON.stringify(payload),
             });
             const post = await res.json();
 

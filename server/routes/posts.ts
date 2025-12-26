@@ -56,13 +56,14 @@ app.post(
             content: z.string().min(1),
             mode: z.enum(["standard", "consultation"]),
             is_published: z.boolean().optional(),
+            images: z.array(z.string()).optional(),
         })
     ),
     async (c) => {
-        const { title, content, mode, is_published } = c.req.valid("json");
+        const { title, content, mode, is_published, images } = c.req.valid("json");
         const supabase = await createClient();
 
-        const { data, error } = await (supabase.from("posts") as any).insert({ title, content, mode, is_published }).select().single();
+        const { data, error } = await (supabase.from("posts") as any).insert({ title, content, mode, is_published, images }).select().single();
 
         if (error) return c.json({ error: error.message }, 500);
 
@@ -82,6 +83,7 @@ app.patch(
             content: z.string().min(1).optional(),
             mode: z.enum(["standard", "consultation"]).optional(),
             is_published: z.boolean().optional(),
+            images: z.array(z.string()).optional(),
         })
     ),
     async (c) => {

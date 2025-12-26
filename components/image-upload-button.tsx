@@ -16,7 +16,7 @@ interface ImageUploadButtonProps {
 
 export function ImageUploadButton({
     onUploadComplete,
-    bucketName = "images",
+    bucketName = "user_uploads",
     className,
     variant = "ghost",
     size = "icon",
