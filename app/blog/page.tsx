@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Background } from "@/components/background";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { SearchInput } from "@/components/ui/search-input";
 import { SelectionBar } from "@/components/selection-bar";
 import { FeatureDiscovery } from "@/components/feature-discovery";

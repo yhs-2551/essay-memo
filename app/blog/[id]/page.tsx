@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Background } from "@/components/background";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { MarkdownContent } from "@/components/markdown-content";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
-import { ArrowLeft, Sparkles, Stars } from "lucide-react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { MarkdownContent } from "@/components/markdown-content";
+import { Activity, ArrowLeft, CheckCircle2, Quote, Sparkles, Stars } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type PostData = {
     post: {
@@ -27,6 +30,7 @@ type PostData = {
             sentiment: { primaryEmotion_ko: string; primaryEmotion_en: string; intensity: number };
             vision: { objects_ko: string[]; objects_en: string[]; mood_ko: string; mood_en: string } | null;
             philosophy: { lens_ko: string; lens_en: string; insight_ko: string; keywords_en: string[] };
+            life_data?: { summary: string; growth_point: string; suggested_actions: string[]; selected_action?: string };
         } | null;
         created_at: string;
     } | null;
@@ -37,6 +41,15 @@ export default function PostPage() {
     const router = useRouter();
     const [data, setData] = useState<PostData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [selectedAction, setSelectedAction] = useState<string | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [customInput, setCustomInput] = useState("");
+    const supabase = createClient();
+
+    const openCustomInputDialog = (initialValue: string = "") => {
+        setCustomInput(initialValue);
+        setIsDialogOpen(true);
+    };
 
     useEffect(() => {
         if (id) {
@@ -50,11 +63,62 @@ export default function PostPage() {
             if (res.ok) {
                 const json = await res.json();
                 setData(json);
+                // Initialize selected action if exists
+                if (json.consultation?.analysis_data?.life_data?.selected_action) {
+                    setSelectedAction(json.consultation.analysis_data.life_data.selected_action);
+                }
             }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleActionSelect = async (action: string) => {
+        if (!data?.consultation) return;
+
+        // Optimistic UI update
+        setSelectedAction(action);
+        setIsDialogOpen(false);
+
+        try {
+            // Prepare updated data
+            const currentAnalysisData = data.consultation.analysis_data;
+            if (!currentAnalysisData || !currentAnalysisData.life_data) return;
+
+            const updatedAnalysisData = {
+                ...currentAnalysisData,
+                life_data: {
+                    ...currentAnalysisData.life_data,
+                    selected_action: action,
+                },
+            };
+
+            // Update DB
+            const { error } = await supabase.from("consultations").update({ analysis_data: updatedAnalysisData }).eq("post_id", id);
+
+            if (error) throw error;
+
+            // Success Feedback
+            toast.success("나의 다짐이 우주에 안전하게 기록되었습니다.");
+
+            // Update local state data to prevent revert on re-render
+            setData((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          consultation: {
+                              ...prev.consultation!,
+                              analysis_data: updatedAnalysisData,
+                          },
+                      }
+                    : null
+            );
+        } catch (e) {
+            console.error("Failed to save action:", e);
+            toast.error("저장에 실패했습니다.");
+            setSelectedAction(null);
         }
     };
 
@@ -72,16 +136,16 @@ export default function PostPage() {
 
     if (!data) return <div>존재하지 않는 글입니다.</div>;
 
-    // Updated Accessors for new Schema
-    const analysisContent = data.consultation?.analysis_data?.philosophy?.insight_ko || data.consultation?.analysis;
-    // Prefer visual mood if available, otherwise fallback to sentiment emotion
-    const mood = data.consultation?.analysis_data?.vision?.mood_ko || data.consultation?.analysis_data?.sentiment?.primaryEmotion_ko;
-    const visionTags = data.consultation?.analysis_data?.vision?.objects_ko; // Use objects_ko
+    // Helpers for Orbit OS Data
+    const cData = data.consultation?.analysis_data;
+    const lifeData = cData?.life_data;
+    const mood = cData?.vision?.mood_ko || cData?.sentiment?.primaryEmotion_ko;
+    const compassText = data.consultation?.analysis; // The main counsel
 
     return (
         <div className='min-h-screen p-6 relative'>
             <Background />
-            <div className='max-w-3xl mx-auto space-y-8'>
+            <div className='max-w-4xl mx-auto space-y-8'>
                 <header className='flex justify-between items-center mb-12'>
                     <Button
                         variant='ghost'
@@ -127,42 +191,217 @@ export default function PostPage() {
                     </div>
                 </Card>
 
+                {/* Orbit OS Analysis Section */}
                 {data.post.mode === "consultation" && data.consultation && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8 }}>
-                        <Card className='p-8 relative overflow-hidden border border-indigo-100/50 dark:border-none bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-950/40 dark:to-purple-950/40 backdrop-blur-xl shadow-2xl shadow-indigo-500/5 dark:shadow-indigo-500/10 rounded-3xl'>
-                            <div className='absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 dark:from-indigo-500 dark:via-purple-500 dark:to-indigo-500 animate-gradient-x opacity-70' />
-
-                            {/* Rich Headers */}
-                            <div className='flex flex-wrap items-center gap-3 mb-6'>
-                                <div className='flex items-center'>
-                                    <div className='p-2.5 rounded-2xl bg-white/50 dark:bg-indigo-400/10 shadow-sm mr-4'>
-                                        <Sparkles className='w-5 h-5 text-indigo-500 dark:text-indigo-300' />
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5, duration: 0.8 }}
+                        className='space-y-6'
+                    >
+                        {/* 1. Emotional Satellite (감정 위성) */}
+                        <div className='rounded-3xl p-6 bg-gradient-to-r from-rose-50 to-indigo-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-white/20 shadow-lg relative overflow-hidden'>
+                            <div className='absolute top-0 left-0 w-full h-full bg-white/40 dark:bg-black/10 backdrop-blur-sm z-0' />
+                            <div className='relative z-10 flex items-center justify-between'>
+                                <div className='flex items-center gap-3'>
+                                    <div className='p-3 bg-white/80 dark:bg-indigo-500/20 rounded-full'>
+                                        <Stars className='w-6 h-6 text-indigo-600 dark:text-indigo-300' />
                                     </div>
-                                    <h2 className='text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-300 dark:to-purple-300'>
-                                        AI 인사이트
-                                    </h2>
+                                    <div>
+                                        <h3 className='text-sm font-semibold text-muted-foreground uppercase tracking-wider'>감정 위성</h3>
+                                        <p className='text-2xl font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-2'>
+                                            {mood || "분석 중"}
+                                            <span className='text-sm font-normal opacity-70 px-3 py-1 rounded-full border border-indigo-200 dark:border-indigo-800'>
+                                                깊이: {cData?.sentiment?.intensity ? Math.round(cData.sentiment.intensity * 100) : 0}%
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className='grid grid-cols-1 md:grid-cols-5 gap-6'>
+                            {/* 2. Today's Discovery (오늘의 발견) - Left (2/5) */}
+                            {lifeData && (
+                                <div className='md:col-span-2 bg-slate-50 dark:bg-black border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 font-mono shadow-inner relative group flex flex-col justify-between'>
+                                    <div className='space-y-6'>
+                                        <h3 className='text-sm uppercase tracking-widest text-slate-400 dark:text-zinc-600 font-bold border-b border-slate-200 dark:border-zinc-900 pb-2 flex items-center gap-2'>
+                                            <Sparkles className='w-4 h-4' /> 오늘의 발견
+                                        </h3>
+
+                                        <div>
+                                            <span className='text-xs text-slate-400 dark:text-zinc-600 mb-2'>요약</span>
+                                            <p className='text-lg text-slate-700 dark:text-emerald-400/90 leading-relaxed font-semibold'>
+                                                {lifeData.summary}
+                                            </p>
+                                        </div>
+
+                                        <div className='pt-4 border-t border-slate-200 dark:border-zinc-900/50'>
+                                            <div className='flex items-start gap-3'>
+                                                <CheckCircle2 className='w-5 h-5 text-blue-500 dark:text-cyan-500 mt-1 shrink-0' />
+                                                <div>
+                                                    <span className='block text-xs text-blue-400 dark:text-cyan-600 mb-1'>
+                                                        잠재 에너지 (Potential Energy)
+                                                    </span>
+                                                    <p className='text-base text-slate-600 dark:text-zinc-300'>{lifeData.growth_point}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* User Choice Section */}
+                                    <div className='mt-8 pt-4 border-t border-slate-200 dark:border-zinc-900/50'>
+                                        <span className='block text-xs text-amber-500/80 dark:text-amber-700 mb-3 flex items-center gap-1 font-bold tracking-wider uppercase'>
+                                            <Sparkles className='w-3 h-3' />
+                                            프리즘의 실천 제안
+                                        </span>
+                                        <p className='text-[11px] text-slate-400 dark:text-zinc-500 mb-3'>
+                                            {selectedAction ? "오늘 나의 마음에 남긴 문장:" : "오늘의 나에게 가장 필요한 한 문장을 선택하세요."}
+                                        </p>
+                                        <div className='space-y-2'>
+                                            {lifeData.suggested_actions?.map((action, i) => (
+                                                <button
+                                                    key={i}
+                                                    className={`w-full text-left p-3 rounded-xl border transition-all text-sm focus:outline-none 
+                                                        ${
+                                                            selectedAction === action
+                                                                ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-medium ring-2 ring-indigo-500/20"
+                                                                : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:border-slate-400 dark:hover:border-zinc-600 hover:scale-[1.02]"
+                                                        }
+                                                    `}
+                                                    onClick={() => handleActionSelect(action)}
+                                                >
+                                                    <div className='flex items-center gap-2'>
+                                                        <span
+                                                            className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                                                                selectedAction === action
+                                                                    ? "border-indigo-200 dark:border-indigo-800 bg-white/50"
+                                                                    : "border-slate-100 dark:border-zinc-800"
+                                                            }`}
+                                                        >
+                                                            {i + 1}
+                                                        </span>
+                                                        {action}
+                                                        {selectedAction === action && <CheckCircle2 className='w-4 h-4 ml-auto text-indigo-500' />}
+                                                    </div>
+                                                </button>
+                                            ))}
+
+                                            {/* Custom Input Option - Always visible to allow switching */}
+                                            {(!selectedAction ||
+                                                (selectedAction &&
+                                                    lifeData.suggested_actions &&
+                                                    !lifeData.suggested_actions.includes(selectedAction))) && (
+                                                <div className='relative'>
+                                                    {selectedAction &&
+                                                    lifeData.suggested_actions &&
+                                                    !lifeData.suggested_actions.includes(selectedAction) ? (
+                                                        // Show as Selected "Direct" Card
+                                                        <button
+                                                            className='w-full text-left p-3 rounded-xl border bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-medium ring-2 ring-indigo-500/20 text-sm hover:opacity-80 transition-opacity'
+                                                            onClick={() => openCustomInputDialog(selectedAction)}
+                                                        >
+                                                            <div className='flex items-center gap-2'>
+                                                                <span className='text-[10px] px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 bg-white/50'>
+                                                                    Direct
+                                                                </span>
+                                                                {selectedAction}
+                                                                <CheckCircle2 className='w-4 h-4 ml-auto text-indigo-500' />
+                                                            </div>
+                                                        </button>
+                                                    ) : (
+                                                        // Show as "+ Direct Input" Button
+                                                        <button
+                                                            className='w-full text-left p-3 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-500 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all text-sm flex items-center gap-2'
+                                                            onClick={() => openCustomInputDialog("")}
+                                                        >
+                                                            <span className='text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-700'>
+                                                                +
+                                                            </span>
+                                                            직접 입력하기
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Fallback for when a PRESET is selected, we still want to show "+ Input" to allow switching away from preset to custom */}
+                                            {selectedAction && lifeData.suggested_actions && lifeData.suggested_actions.includes(selectedAction) && (
+                                                <button
+                                                    className='w-full text-left p-3 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 text-slate-500 dark:text-zinc-500 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all text-sm flex items-center gap-2'
+                                                    onClick={() => openCustomInputDialog("")}
+                                                >
+                                                    <span className='text-[10px] px-1.5 py-0.5 rounded border border-slate-200 dark:border-zinc-700'>
+                                                        +
+                                                    </span>
+                                                    직접 입력하기
+                                                </button>
+                                            )}
+
+                                            {!lifeData.suggested_actions && <p className='text-xs text-muted-foreground'>추천 액션이 없습니다.</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 3. Deep Signal (심층 신호) - Right (3/5) */}
+                            <div
+                                className={`rounded-2xl p-8 border shadow-sm relative overflow-hidden ${
+                                    lifeData ? "md:col-span-3" : "md:col-span-5"
+                                } bg-[#FDFBF7] dark:bg-[#1c1917] border-stone-200 dark:border-stone-800`}
+                            >
+                                <div className='flex items-center gap-2 mb-6 text-amber-800 dark:text-stone-400'>
+                                    <Activity className='w-6 h-6' />
+                                    <span className='font-serif italic font-medium text-lg'>심층 신호 (Deep Signal)</span>
                                 </div>
 
-                                {mood && (
-                                    <span className='px-3 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20'>
-                                        Mood: {mood}
-                                    </span>
-                                )}
-                                {visionTags &&
-                                    visionTags.map((tag, i) => (
-                                        <span
-                                            key={i}
-                                            className='px-3 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20'
-                                        >
-                                            #{tag}
-                                        </span>
-                                    ))}
-                            </div>
+                                <div className='prose prose-stone dark:prose-invert max-w-none text-xl leading-relaxed font-serif'>
+                                    <MarkdownContent content={compassText || ""} />
+                                </div>
 
-                            <div className='prose dark:prose-invert max-w-none text-lg leading-relaxed text-slate-800/90 dark:text-indigo-100/90 [font-style:italic]'>
-                                <MarkdownContent content={analysisContent || ""} />
+                                <div className='mt-12 pt-6 border-t border-stone-200 dark:border-stone-800 flex justify-end'>
+                                    <div className='text-sm text-stone-400 font-serif italic flex items-center gap-2'>
+                                        <Quote className='w-4 h-4' />
+                                        프리즘의 시선: {cData?.philosophy?.lens_ko}
+                                    </div>
+                                </div>
                             </div>
-                        </Card>
+                        </div>
+
+                        {/* Custom Input Dialog */}
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogContent className='sm:max-w-md bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border-slate-200 dark:border-zinc-800'>
+                                <DialogHeader>
+                                    <DialogTitle>나만의 문장 기록하기</DialogTitle>
+                                </DialogHeader>
+                                <div className='space-y-4 py-4'>
+                                    <p className='text-sm text-muted-foreground'>오늘 나의 마음을 가장 잘 표현하는 문장을 자유롭게 적어주세요.</p>
+                                    <Input
+                                        placeholder='예: 내 마음의 소리에 귀 기울이자'
+                                        value={customInput}
+                                        onChange={(e) => setCustomInput(e.target.value)}
+                                        className='h-12 text-lg bg-slate-50 dark:bg-zinc-950/50 border-slate-200 dark:border-zinc-800 focus-visible:ring-indigo-500'
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && customInput.trim()) {
+                                                handleActionSelect(customInput);
+                                            }
+                                        }}
+                                        autoFocus
+                                    />
+                                </div>
+                                <DialogFooter className='sm:justify-end gap-2'>
+                                    <Button variant='outline' onClick={() => setIsDialogOpen(false)}>
+                                        취소
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleActionSelect(customInput)}
+                                        disabled={!customInput.trim()}
+                                        className='bg-indigo-600 hover:bg-indigo-700 text-white'
+                                    >
+                                        기록하기
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </motion.div>
                 )}
             </div>
