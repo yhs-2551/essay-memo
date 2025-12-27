@@ -361,7 +361,18 @@ export default function PostPage() {
                                 <div className='mt-12 pt-6 border-t border-stone-200 dark:border-stone-800 flex justify-end'>
                                     <div className='text-sm text-stone-400 font-serif italic flex items-center gap-2'>
                                         <Quote className='w-4 h-4' />
-                                        프리즘의 시선: {cData?.philosophy?.lens_ko}
+                                        {(() => {
+                                            const personaId = cData?.meta?.persona || "prism";
+                                            const names: Record<string, string> = {
+                                                prism: "프리즘의 시선",
+                                                nietzsche: "니체의 시선",
+                                                aurelius: "아우렐리우스의 시선",
+                                                jung: "칼 융의 시선",
+                                                zhuangzi: "장자의 시선",
+                                                beauvoir: "보부아르의 시선",
+                                            };
+                                            return `${names[personaId] || "프리즘의 시선"}: ${cData?.philosophy?.lens_ko}`;
+                                        })()}
                                     </div>
                                 </div>
                             </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Sparkles, Save, Eye, Layout } from "lucide-react";
+import { ArrowLeft, Sparkles, Save, Eye, Layout, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { useNavigationWarning } from "@/hooks/use-navigation-warning";
 import { ImageUploadButton } from "@/components/image-upload-button";
 import { useUsageStore, MAX_FREE_CONSULTATIONS } from "@/hooks/use-usage-limit";
 import { SubscriptionProModal } from "@/components/subscription-pro-modal";
+import { PersonaSelectionModal, PERSONAS } from "@/components/persona-selection-modal";
 import { ImagePreviewStrip } from "@/components/image-preview-strip";
 import { MarkdownContent } from "@/components/markdown-content";
 
@@ -48,6 +49,8 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     const [mounted, setMounted] = useState(false);
     const toastShownRef = useRef(false);
 
+    const [showPersonaModal, setShowPersonaModal] = useState(false);
+
     const hasUnsavedChanges = title !== (initialData?.title || "") || content !== (initialData?.content || "");
     useNavigationWarning(hasUnsavedChanges);
 
@@ -56,22 +59,44 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
 
     const { handlePaste, isUploading } = useImageUpload();
 
-    const { count, isSubscribed, increment } = useUsageStore();
+    const { count, isSubscribed, increment, refreshUsage } = useUsageStore();
     const [showSubscription, setShowSubscription] = useState(false);
+
+    useEffect(() => {
+        refreshUsage();
+    }, [refreshUsage]);
 
     useEffect(() => {
         setMounted(true);
         if (!isEditing) {
-            const draft = loadDraft();
-            if (draft) {
-                if (draft.title) setTitle(draft.title);
-                if (draft.content) setContent(draft.content);
-                if (draft.mode) setMode(draft.mode);
-                if ((draft.title || draft.content) && !toastShownRef.current) {
-                    toastShownRef.current = true;
-                    toast.info("이전에 작성하던 글을 불러왔습니다.");
+            const load = async () => {
+                const draft = await loadDraft();
+                if (draft && (draft.title || draft.content)) {
+                    // [UX Upgrade] Don't auto-load. Ask first.
+                    toast("이전에 작성하던 글이 발견되었습니다.", {
+                        description: "작성하던 내용을 복구하시겠습니까?",
+                        action: {
+                            label: "복구하기",
+                            onClick: () => {
+                                if (draft.title) setTitle(draft.title);
+                                if (draft.content) setContent(draft.content);
+                                if (draft.mode) setMode(draft.mode);
+                                toast.success("글이 성공적으로 복구되었습니다.");
+                            },
+                        },
+                        cancel: {
+                            label: "삭제",
+                            onClick: () => {
+                                // Clear draft if user rejects
+                                clearDraft();
+                                toast.info("임시 저장된 글을 삭제했습니다.");
+                            },
+                        },
+                        duration: 8000, // Give user enough time
+                    });
                 }
-            }
+            };
+            load();
         }
     }, [loadDraft, isEditing]);
 
@@ -168,10 +193,12 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
         setUploadedImages((prev) => prev.filter((u) => u !== url));
     };
 
+    const selectedPersonaObj = PERSONAS.find((p) => p.id === persona) || PERSONAS[0];
+
     return (
         <div className='min-h-screen p-6 pt-24 relative'>
             <Background />
-            <div className='max-w-4xl mx-auto space-y-6 pb-20'>
+            <div className='max-w-7xl mx-auto space-y-6 pb-20'>
                 <header className='flex items-center justify-between'>
                     <div className='flex items-center space-x-4'>
                         <Button variant='ghost' size='icon' onClick={() => router.back()}>
@@ -204,8 +231,8 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                     </div>
                 </header>
 
-                <div className='grid grid-cols-1 lg:grid-cols-4 gap-6'>
-                    <div className='lg:col-span-3 space-y-4'>
+                <div className='grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8'>
+                    <div className='space-y-4 min-w-0'>
                         {viewMode === "edit" ? (
                             <Card className='p-8 bg-background/60 backdrop-blur-xl border-none shadow-2xl min-h-[600px] flex flex-col'>
                                 <Input
@@ -248,7 +275,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                     </div>
 
                     <div className='space-y-6'>
-                        <Card className='p-6 bg-background/60 backdrop-blur-md border-none shadow-xl'>
+                        <Card className='p-5 bg-background/60 backdrop-blur-md border-none shadow-xl'>
                             <h3 className='font-bold text-sm mb-4 uppercase tracking-tighter'>인사이트 모드</h3>
                             <div className='space-y-3'>
                                 <div
@@ -282,49 +309,47 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                 </div>
 
                                 {mode === "consultation" && (
-                                    <Card className='p-6 bg-background/60 backdrop-blur-md border-none shadow-xl mt-6'>
-                                        <h3 className='font-bold text-sm mb-4 uppercase tracking-tighter flex items-center justify-between'>
-                                            위대한 정신
-                                            {mounted && !isSubscribed && (
-                                                <span className='text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-muted-foreground'>
-                                                    PRO
-                                                </span>
-                                            )}
-                                        </h3>
+                                    <Card className='p-5 bg-background/60 backdrop-blur-md border-none shadow-xl mt-6'>
+                                        <div className='flex items-center justify-between mb-4'>
+                                            <h3 className='font-bold text-sm uppercase tracking-tighter'>
+                                                위대한 정신
+                                                {mounted && !isSubscribed && (
+                                                    <span className='ml-2 text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-muted-foreground'>
+                                                        PRO
+                                                    </span>
+                                                )}
+                                            </h3>
+                                        </div>
 
-                                        <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                                            {[
-                                                { id: "prism", name: "프리즘", desc: "내면의 진실을 비추는 균형", icon: "✨" },
-                                                { id: "nietzsche", name: "니체", desc: "운명을 사랑하는 초인", icon: "🔥" },
-                                                { id: "aurelius", name: "아우렐리우스", desc: "흔들리지 않는 평온", icon: "🏛️" },
-                                                { id: "jung", name: "칼 융", desc: "무의식의 그림자 탐구", icon: "🌑" },
-                                                { id: "zhuangzi", name: "장자", desc: "자유로운 우주의 나비", icon: "🦋" },
-                                                { id: "beauvoir", name: "보부아르", desc: "실존과 주체적 자유", icon: "👠" },
-                                            ].map((p) => (
-                                                <div
-                                                    key={p.id}
-                                                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                                                        persona === p.id
-                                                            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm"
-                                                            : "border-transparent hover:bg-muted/50"
-                                                    } ${mounted && !isSubscribed && p.id !== "prism" ? "opacity-50 grayscale" : ""}`}
-                                                    onClick={() => {
-                                                        if (!isSubscribed && p.id !== "prism") {
-                                                            setShowSubscription(true);
-                                                            return;
-                                                        }
-                                                        setPersona(p.id);
-                                                        setUpdateAi(true);
-                                                    }}
-                                                >
-                                                    <div className='text-xl shrink-0'>{p.icon}</div>
-                                                    <div className='min-w-0 flex-1'>
-                                                        <div className='font-bold text-sm truncate'>{p.name}</div>
-                                                        <div className='text-[10px] text-muted-foreground truncate'>{p.desc}</div>
-                                                    </div>
-                                                    {persona === p.id && <div className='ml-auto w-2 h-2 rounded-full bg-indigo-500 shrink-0' />}
+                                        <div
+                                            className='group relative bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/40 dark:to-purple-950/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-500/30 cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-400'
+                                            onClick={() => setShowPersonaModal(true)}
+                                        >
+                                            <div className='flex items-center gap-4 relative z-10'>
+                                                <div className='w-14 h-14 rounded-2xl bg-white dark:bg-indigo-900/60 shadow-sm flex items-center justify-center text-3xl ring-2 ring-indigo-50 dark:ring-indigo-500/20 group-hover:scale-105 transition-transform'>
+                                                    {selectedPersonaObj.icon}
                                                 </div>
-                                            ))}
+                                                <div className='flex-1 min-w-0'>
+                                                    <div className='font-bold text-lg text-indigo-950 dark:text-indigo-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors'>
+                                                        {selectedPersonaObj.name}
+                                                    </div>
+                                                    <div className='text-xs text-muted-foreground truncate opacity-80 group-hover:opacity-100'>
+                                                        {selectedPersonaObj.desc}
+                                                    </div>
+                                                </div>
+                                                <ChevronRight className='w-5 h-5 text-muted-foreground/50 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all' />
+                                            </div>
+
+                                            <div className='absolute inset-0 bg-white/0 group-hover:bg-white/10 dark:group-hover:bg-indigo-500/10 transition-colors pointer-events-none' />
+                                        </div>
+
+                                        <div className='text-center mt-3'>
+                                            <span
+                                                onClick={() => setShowPersonaModal(true)}
+                                                className='text-[10px] text-muted-foreground cursor-pointer hover:underline hover:text-indigo-500'
+                                            >
+                                                모든 페르소나 보기
+                                            </span>
                                         </div>
                                     </Card>
                                 )}
@@ -405,6 +430,17 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                 </div>
             </div>
             <SubscriptionProModal open={showSubscription} onOpenChange={setShowSubscription} />
+            <PersonaSelectionModal
+                open={showPersonaModal}
+                onOpenChange={setShowPersonaModal}
+                selectedPersona={persona}
+                onSelect={(id) => {
+                    setPersona(id);
+                    setUpdateAi(true);
+                }}
+                isSubscribed={isSubscribed || false}
+                onSubscribeClick={() => setShowSubscription(true)}
+            />
         </div>
     );
 }

@@ -10,6 +10,8 @@ import { useImageUpload } from "@/hooks/use-image-upload";
 import { useNavigationWarning } from "@/hooks/use-navigation-warning";
 import { ImageUploadButton } from "@/components/image-upload-button";
 import { ImagePreviewStrip } from "@/components/image-preview-strip";
+import { useAutoSave } from "@/hooks/use-auto-save";
+import { toast } from "sonner";
 
 interface MemoEditorProps {
     initialContent?: string;
@@ -39,12 +41,38 @@ export function MemoEditor({
     const hasUnsavedChanges = content !== (initialContent || "") && content.trim() !== "";
     useNavigationWarning(hasUnsavedChanges);
 
+    // [Orbit Sync Engine]: Auto-Save Hook Integration
+    const { isSaving, loadDraft, clearDraft } = useAutoSave<{ content: string; images: string[] }>(
+        "draft-memo-new",
+        { content, images: uploadedImages },
+        2000
+    );
+
     useEffect(() => {
         setMounted(true);
         if (autoFocus) {
             textareaRef.current?.focus();
         }
-    }, [autoFocus]);
+
+        // Load Draft
+        const restoreDraft = async () => {
+            const draft = await loadDraft();
+            if (draft && (draft.content || draft.images?.length)) {
+                toast("작성 중인 메모가 있습니다.", {
+                    action: {
+                        label: "복구",
+                        onClick: () => {
+                            if (draft.content) setContent(draft.content);
+                            if (draft.images) setUploadedImages(draft.images);
+                            toast.success("메모 복구 완료");
+                        },
+                    },
+                    cancel: { label: "삭제", onClick: clearDraft },
+                });
+            }
+        };
+        restoreDraft();
+    }, [autoFocus, loadDraft, clearDraft]);
 
     const handleSave = async () => {
         if (!content.trim()) return;
@@ -52,6 +80,7 @@ export function MemoEditor({
         try {
             const finalContent = uploadedImages.length > 0 ? `${content}\n\n${uploadedImages.map((url) => `![이미지](${url})`).join("\n")}` : content;
             await onSave(finalContent);
+            clearDraft(); // [Orbit Sync]: Clear draft after successful save
             if (!initialContent) {
                 setContent("");
                 setUploadedImages([]);
@@ -69,7 +98,12 @@ export function MemoEditor({
 
     return (
         <Card className={`overflow-hidden transition-all border-none bg-background/60 backdrop-blur-xl shadow-2xl ${className}`}>
-            <div className='p-4'>
+            <div className='p-4 relative'>
+                {/* [Orbit Sync]: Saving Indicator */}
+                <div className='absolute top-4 right-4 text-[10px] font-medium text-muted-foreground/50 transition-opacity duration-500'>
+                    {isSaving ? "저장 중..." : "저장됨"}
+                </div>
+
                 <Textarea
                     ref={textareaRef}
                     placeholder={placeholder}

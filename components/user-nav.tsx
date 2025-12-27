@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@/hooks/use-user";
 import { createClient } from "@/lib/supabase/client";
+import { l1Storage } from "@/utils/indexed-db";
 
 import { LogIn, LogOut, Loader2, User as UserIcon } from "lucide-react";
 import Link from "next/link";
@@ -65,8 +66,9 @@ export function UserNav() {
                     className='text-red-500 focus:text-red-500 cursor-pointer'
                     onClick={async () => {
                         const supabase = createClient();
+                        await l1Storage.clearAll(); // Orbit L1 Security: Nuke Local Drafts
                         await supabase.auth.signOut();
-                        window.location.reload(); // Refresh to clear server-side state/cookies visually if needed, but the hook updates first.
+                        window.location.reload();
                     }}
                 >
                     <LogOut className='mr-2 h-4 w-4' />
