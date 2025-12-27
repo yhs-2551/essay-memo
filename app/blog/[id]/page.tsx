@@ -101,7 +101,7 @@ export default function PostPage() {
             if (error) throw error;
 
             // Success Feedback
-            toast.success("나의 다짐이 우주에 안전하게 기록되었습니다.");
+            toast.success("오늘의 문장이 안전하게 기록되었습니다.");
 
             // Update local state data to prevent revert on re-render
             setData((prev) =>

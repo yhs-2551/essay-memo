@@ -27,19 +27,28 @@ export const useUsageStore = create<UsageState>((set) => ({
             return;
         }
 
-        const { data: profile } = await supabase.from("profiles").select("consultation_count, last_consultation_date").eq("id", user.id).single();
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("consultation_count, last_consultation_date, subscription_tier")
+            .eq("id", user.id)
+            .single();
 
         if (profile) {
-            // Check if it's a new day, if so, the local view should be 0 (though backend logic handles the real check)
-            // But for UI display, we match the backend logic:
             const p = profile as any;
             const today = new Date();
             const lastDate = p.last_consultation_date ? new Date(p.last_consultation_date) : new Date(0);
             const isSameDay = today.toDateString() === lastDate.toDateString();
 
-            set({ count: isSameDay ? p.consultation_count || 0 : 0, loading: false });
+            // Check tier
+            const isPro = p.subscription_tier === "pro";
+
+            set({
+                count: isSameDay ? p.consultation_count || 0 : 0,
+                loading: false,
+                isSubscribed: isPro, // Update accurate status
+            });
         } else {
-            set({ count: 0, loading: false });
+            set({ count: 0, loading: false, isSubscribed: false });
         }
     },
     increment: () => set((state) => ({ count: state.count + 1 })),

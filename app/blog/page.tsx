@@ -124,98 +124,106 @@ export default function BlogListPage() {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [dateFilter, setDateFilter] = useState<string>(""); // "YYYY-MM"
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+    const [isBulkDelete, setIsBulkDelete] = useState(false);
     const { theme } = useTheme();
     const router = useRouter();
     const observerTarget = useRef<HTMLDivElement>(null);
+
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const { selectedIds, toggleSelect, selectAll, clearSelection, isSelected } = useSelection(posts);
 
     const handleEdit = (post: Post) => {
         router.replace(`/blog/edit/${post.id}`);
     };
-
     useEffect(() => {
-        setPage(1);
-        setPosts([]);
-        fetchPosts(1, searchQuery);
-    }, [searchQuery]);
+        let isMounted = true;
+        const fetchPosts = async () => {
+            try {
+                setFetching(true);
+                const params = new URLSearchParams();
+                if (searchQuery) params.append("q", searchQuery);
+                if (page > 1) params.append("page", page.toString());
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !fetching && !loadingMore) {
-                    const nextPage = page + 1;
-                    setPage(nextPage);
-                    fetchPosts(nextPage, searchQuery);
+                const res = await fetch(`/api/posts?${params.toString()}`);
+                if (!res.ok) throw new Error("Failed to fetch posts");
+
+                const data = await res.json();
+                if (isMounted) {
+                    if (page === 1) {
+                        setPosts(data.posts || []);
+                    } else {
+                        setPosts((prev) => [...prev, ...(data.posts || [])]);
+                    }
+                    setHasMore(data.hasMore);
                 }
-            },
-            { threshold: 0.1 }
-        );
+            } catch (error) {
+                console.error(error);
+                if (isMounted) toast.error("기록을 불러오지 못했습니다.");
+            } finally {
+                if (isMounted) {
+                    setFetching(false);
+                    setLoadingMore(false);
+                }
+            }
+        };
 
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current);
-        }
+        const debounceTimer = setTimeout(() => {
+            fetchPosts();
+        }, 300);
 
-        return () => observer.disconnect();
-    }, [hasMore, fetching, loadingMore, page, searchQuery]);
+        return () => {
+            isMounted = false;
+            clearTimeout(debounceTimer);
+        };
+    }, [searchQuery, page]);
+    const handleDelete = (postId: string) => {
+        setDeleteTargetId(postId);
+    };
 
-    const fetchPosts = async (pageNum: number, query = "") => {
-        if (pageNum === 1) setFetching(true);
-        else setLoadingMore(true);
+    const handleBulkDelete = () => {
+        if (selectedIds.size === 0) return;
+        setIsBulkDelete(true);
+    };
 
+    const executeDelete = async () => {
         try {
-            const limit = 20;
-            const res = await fetch(`/api/posts?q=${encodeURIComponent(query)}&page=${pageNum}&limit=${limit}`);
-            const data = await res.json();
+            if (isBulkDelete) {
+                const ids = Array.from(selectedIds);
+                const res = await fetch("/api/posts/bulk-delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids }),
+                });
 
-            if (data.posts) {
-                if (pageNum === 1) {
-                    setPosts(data.posts);
+                if (res.ok) {
+                    setPosts((prev) => prev.filter((p) => !ids.includes(p.id)));
+                    clearSelection();
+                    toast.success("선택한 글들이 삭제되었습니다.");
                 } else {
-                    setPosts((prev) => [...prev, ...data.posts]);
+                    throw new Error("Bulk delete failed");
                 }
-                setHasMore(data.hasMore);
-            }
-        } catch (e) {
-            console.error(e);
-            toast.error("기록을 불러오는데 실패했습니다.");
-        } finally {
-            setLoadingMore(false);
-            setFetching(false);
-        }
-    };
+            } else if (deleteTargetId) {
+                const res = await fetch(`/api/posts/${deleteTargetId}`, { method: "DELETE" });
 
-    const handleDelete = async (postId: string) => {
-        if (!confirm("정말 이 글을 삭제하시겠습니까?")) return;
-
-        try {
-            const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-            if (res.ok) {
-                setPosts((prev) => prev.filter((p) => p.id !== postId));
-                toast.success("글이 삭제되었습니다.");
+                if (res.ok) {
+                    setPosts((prev) => prev.filter((p) => p.id !== deleteTargetId));
+                    toast.success("글이 삭제되었습니다.");
+                } else {
+                    throw new Error("Delete failed");
+                }
             }
         } catch (error) {
+            console.error(error);
             toast.error("삭제 중 오류가 발생했습니다.");
-        }
-    };
-
-    const handleBulkDelete = async () => {
-        const ids = Array.from(selectedIds);
-        if (!confirm(`선택한 ${ids.length}개의 글을 삭제하시겠습니까?`)) return;
-
-        try {
-            const res = await fetch("/api/posts/bulk-delete", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids }),
-            });
-            if (res.ok) {
-                setPosts((prev) => prev.filter((p) => !ids.includes(p.id)));
-                clearSelection();
-                toast.success("선택한 글들이 삭제되었습니다.");
-            }
-        } catch (error) {
-            toast.error("일괄 삭제 중 오류가 발생했습니다.");
+        } finally {
+            setDeleteTargetId(null);
+            setIsBulkDelete(false);
         }
     };
 
@@ -230,6 +238,8 @@ export default function BlogListPage() {
     return (
         <div className='min-h-screen p-6 pt-24 relative'>
             <Background />
+
+            {/* Header and List Content (Keeping mostly same, just ensuring context) */}
             <div className='max-w-4xl mx-auto space-y-6'>
                 <header className='flex flex-col gap-8'>
                     <div className='flex items-center justify-between'>
@@ -243,7 +253,7 @@ export default function BlogListPage() {
                         </h1>
                         <Link href='/blog/new'>
                             <Button
-                                variant={theme === "dark" ? "cosmic" : "cute"}
+                                variant={mounted ? (theme === "dark" ? "cosmic" : "cute") : "default"}
                                 size='lg'
                                 className='rounded-2xl shadow-xl shadow-primary/10 transition-all hover:scale-105'
                             >
@@ -344,6 +354,41 @@ export default function BlogListPage() {
             />
 
             <FeatureDiscovery />
+
+            <Dialog
+                open={!!deleteTargetId || isBulkDelete}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDeleteTargetId(null);
+                        setIsBulkDelete(false);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>기록 삭제</DialogTitle>
+                        <DialogDescription>
+                            {isBulkDelete
+                                ? `선택한 ${selectedIds.size}개의 기록을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+                                : "정말 이 기록을 삭제하시겠습니까? 삭제된 기록은 복구할 수 없습니다."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant='ghost'
+                            onClick={() => {
+                                setDeleteTargetId(null);
+                                setIsBulkDelete(false);
+                            }}
+                        >
+                            취소
+                        </Button>
+                        <Button variant='destructive' onClick={executeDelete}>
+                            삭제
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

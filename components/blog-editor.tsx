@@ -39,6 +39,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     const [content, setContent] = useState(initialData?.content || "");
     const [uploadedImages, setUploadedImages] = useState<string[]>([]);
     const [mode, setMode] = useState<"standard" | "consultation">(initialData?.mode || "standard");
+    const [persona, setPersona] = useState("prism");
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
     const [updateAi, setUpdateAi] = useState(isEditing && initialData?.mode === "consultation");
@@ -131,7 +132,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                         const aiRes = await fetch("/api/ai/analyze", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ postId: post.id }),
+                            body: JSON.stringify({ postId: post.id, persona }),
                         });
 
                         if (aiRes.ok) {
@@ -279,6 +280,54 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                     </div>
                                     <div className='text-[10px] text-muted-foreground mt-1'>심리적 분석과 위로를 제공합니다.</div>
                                 </div>
+
+                                {mode === "consultation" && (
+                                    <Card className='p-6 bg-background/60 backdrop-blur-md border-none shadow-xl mt-6'>
+                                        <h3 className='font-bold text-sm mb-4 uppercase tracking-tighter flex items-center justify-between'>
+                                            위대한 정신
+                                            {mounted && !isSubscribed && (
+                                                <span className='text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-muted-foreground'>
+                                                    PRO
+                                                </span>
+                                            )}
+                                        </h3>
+
+                                        <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                                            {[
+                                                { id: "prism", name: "프리즘", desc: "내면의 진실을 비추는 균형", icon: "✨" },
+                                                { id: "nietzsche", name: "니체", desc: "운명을 사랑하는 초인", icon: "🔥" },
+                                                { id: "aurelius", name: "아우렐리우스", desc: "흔들리지 않는 평온", icon: "🏛️" },
+                                                { id: "jung", name: "칼 융", desc: "무의식의 그림자 탐구", icon: "🌑" },
+                                                { id: "zhuangzi", name: "장자", desc: "자유로운 우주의 나비", icon: "🦋" },
+                                                { id: "beauvoir", name: "보부아르", desc: "실존과 주체적 자유", icon: "👠" },
+                                            ].map((p) => (
+                                                <div
+                                                    key={p.id}
+                                                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                                                        persona === p.id
+                                                            ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-sm"
+                                                            : "border-transparent hover:bg-muted/50"
+                                                    } ${mounted && !isSubscribed && p.id !== "prism" ? "opacity-50 grayscale" : ""}`}
+                                                    onClick={() => {
+                                                        if (!isSubscribed && p.id !== "prism") {
+                                                            setShowSubscription(true);
+                                                            return;
+                                                        }
+                                                        setPersona(p.id);
+                                                        setUpdateAi(true);
+                                                    }}
+                                                >
+                                                    <div className='text-xl shrink-0'>{p.icon}</div>
+                                                    <div className='min-w-0 flex-1'>
+                                                        <div className='font-bold text-sm truncate'>{p.name}</div>
+                                                        <div className='text-[10px] text-muted-foreground truncate'>{p.desc}</div>
+                                                    </div>
+                                                    {persona === p.id && <div className='ml-auto w-2 h-2 rounded-full bg-indigo-500 shrink-0' />}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                )}
                             </div>
 
                             {isEditing && mode === "consultation" && (
