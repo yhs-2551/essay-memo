@@ -295,6 +295,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                         label={uploadedImages.length >= 20 ? '이미지 첨부 제한 도달 (최대 20개)' : '이미지 첨부'}
                                         disabled={uploadedImages.length >= 20}
                                     />
+                                    <span className="text-xs text-muted-foreground/50 ml-2">{uploadedImages.length}/20</span>
                                 </div>
                             </Card>
                         ) : (

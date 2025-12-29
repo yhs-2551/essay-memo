@@ -1,9 +1,11 @@
 import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, Loader2, Image as ImageIcon } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 import { useImageUpload } from '@/hooks/use-image-upload'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { toast } from 'sonner'
+import { IMAGE_CONFIG } from '@/lib/constants'
 
 interface ImageUploadButtonProps {
     onUploadComplete: (url: string) => void
@@ -13,6 +15,9 @@ interface ImageUploadButtonProps {
     size?: 'default' | 'sm' | 'lg' | 'icon'
     label?: string
     disabled?: boolean
+    // Total size tracking (optional)
+    currentTotalBytes?: number
+    maxTotalBytes?: number
 }
 
 export function ImageUploadButton({
@@ -23,6 +28,8 @@ export function ImageUploadButton({
     size = 'icon',
     label = '이미지 첨부',
     disabled = false,
+    currentTotalBytes = 0,
+    maxTotalBytes,
 }: ImageUploadButtonProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { uploadImage, isUploading } = useImageUpload(bucketName)
@@ -31,12 +38,25 @@ export function ImageUploadButton({
         const file = e.target.files?.[0]
         if (!file) return
 
+        // Guard: Check per-file size limit
+        if (file.size > IMAGE_CONFIG.MAX_FILE_SIZE_BYTES) {
+            toast.error(`이미지당 최대 ${IMAGE_CONFIG.MAX_FILE_SIZE_MB}MB까지 업로드 가능합니다.`)
+            return
+        }
+
+        // Guard: Check total size limit (only if maxTotalBytes is provided)
+        if (maxTotalBytes && currentTotalBytes + file.size > maxTotalBytes) {
+            const maxTotalMB = Math.round(maxTotalBytes / (1024 * 1024))
+            toast.error(`총 이미지 용량이 ${maxTotalMB}MB를 초과합니다.`)
+            return
+        }
+
         const url = await uploadImage(file)
         if (url) {
             onUploadComplete(url)
         }
 
-        // Reset input so same file can be selected again if needed
+        // Reset input
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }

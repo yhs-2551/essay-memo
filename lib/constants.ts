@@ -57,3 +57,20 @@ export const UI_CONFIG = {
     TOAST_DURATION_MS: 3000,
     PAGINATION_LIMIT: 20,
 } as const
+
+// --- Image Upload Configuration ---
+export const IMAGE_CONFIG = {
+    // Per-image limits
+    MAX_FILE_SIZE_MB: 5,
+    MAX_FILE_SIZE_BYTES: 5 * 1024 * 1024,
+
+    // Memo limits (5 images × 5MB = 25MB max)
+    MEMO_MAX_COUNT: 5,
+    MEMO_MAX_TOTAL_MB: 25,
+    MEMO_MAX_TOTAL_BYTES: 25 * 1024 * 1024,
+
+    // Blog/Essay limits (20 images × 5MB = 100MB max)
+    BLOG_MAX_COUNT: 20,
+    BLOG_MAX_TOTAL_MB: 100,
+    BLOG_MAX_TOTAL_BYTES: 100 * 1024 * 1024,
+} as const

@@ -242,7 +242,14 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
             // Server wins if significantly newer
             if (server.timestamp > local.timestamp + 1000) {
                 console.log('Orbit Sync: Remote logic prevails. Syncing down.')
-                toast.info('다른 기기에서 작성된 최신 글을 불러왔습니다.')
+
+                // [UX] Only notify if there's meaningful local data being replaced
+                // Avoid showing toast on every page load
+                const hasLocalContent = local.data && JSON.stringify(local.data).length > 50
+                if (hasLocalContent) {
+                    toast.info('다른 기기에서 작성된 최신 글을 불러왔습니다.')
+                }
+
                 await saveToLocal(server.data)
                 return server.data
             }

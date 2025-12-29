@@ -43,12 +43,24 @@ app.post(
         'json',
         z.object({
             content: z.string().min(1),
+            images: z.array(z.string()).optional(),
         })
     ),
     async (c) => {
-        const { content } = c.req.valid('json')
+        const { content, images } = c.req.valid('json')
         const supabase = await createClient()
-        const { data, error } = await (supabase.from('memos') as any).insert({ content }).select().single()
+
+        // [FIX] Get authenticated user for RLS compliance
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+            return c.json({ error: 'Unauthorized: Please log in' }, 401)
+        }
+
+        // [FIX] Include user_id for RLS policy
+        const { data, error } = await (supabase.from('memos') as any).insert({ content, images, user_id: user.id }).select().single()
 
         if (error) return c.json({ error: error.message }, 500)
 
@@ -65,13 +77,23 @@ app.patch(
         'json',
         z.object({
             content: z.string().min(1),
+            images: z.array(z.string()).optional(),
         })
     ),
     async (c) => {
         const id = c.req.param('id')
-        const { content } = c.req.valid('json')
+        const body = c.req.valid('json')
         const supabase = await createClient()
-        const { data, error } = await (supabase.from('memos') as any).update({ content }).eq('id', id).select().single()
+
+        // [FIX] Auth check for RLS
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+            return c.json({ error: 'Unauthorized: Please log in' }, 401)
+        }
+
+        const { data, error, count } = await (supabase.from('memos') as any).update(body).eq('id', id).select().single()
 
         if (error) return c.json({ error: error.message }, 500)
         return c.json(data)
@@ -81,11 +103,24 @@ app.patch(
 app.delete('/:id', async (c) => {
     const id = c.req.param('id')
     const supabase = await createClient()
-    const { error } = await supabase.from('memos').delete().eq('id', id)
+
+    // [FIX] Auth check for RLS
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Please log in' }, 401)
+    }
+
+    const { error, count } = await supabase.from('memos').delete({ count: 'exact' }).eq('id', id)
 
     if (error) return c.json({ error: error.message }, 500)
 
-    await logActivity('MEMO_DELETE', { memoId: id }) // No explicit user_id needed as logger will fetch from session
+    if (count === 0) {
+        return c.json({ error: 'Memo not found or you do not have permission.' }, 403)
+    }
+
+    await logActivity('MEMO_DELETE', { memoId: id })
 
     return c.json({ success: true })
 })
@@ -93,13 +128,26 @@ app.delete('/:id', async (c) => {
 app.post('/bulk-delete', zValidator('json', z.object({ ids: z.array(z.string().uuid()) })), async (c) => {
     const { ids } = c.req.valid('json')
     const supabase = await createClient()
-    const { error } = await supabase.from('memos').delete().in('id', ids)
+
+    // [FIX] Auth check for RLS
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Please log in' }, 401)
+    }
+
+    const { error, count } = await supabase.from('memos').delete({ count: 'exact' }).in('id', ids)
 
     if (error) return c.json({ error: error.message }, 500)
 
+    if (count === 0) {
+        return c.json({ error: 'No memos were deleted. You may not have permission.' }, 403)
+    }
+
     await logActivity('MEMO_DELETE', { count: ids.length, bulk: true })
 
-    return c.json({ success: true })
+    return c.json({ success: true, deletedCount: count })
 })
 
 export const memos = app

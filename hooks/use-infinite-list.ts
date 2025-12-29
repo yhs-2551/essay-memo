@@ -101,9 +101,14 @@ export function useInfiniteList<T extends { id: string; created_at: string }>(
     }, [loadingMore, hasMore])
 
     // ===== Search Handler =====
+    // [FIX] Track previous searchQuery to only reset when it actually changes
+    const prevSearchQuery = useRef(searchQuery)
 
     useEffect(() => {
-        if (isFirstRender.current) return
+        // Guard: Skip if searchQuery hasn't actually changed
+        if (prevSearchQuery.current === searchQuery) return
+
+        prevSearchQuery.current = searchQuery
         setPage(1)
         setItems([])
     }, [searchQuery])
