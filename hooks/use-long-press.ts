@@ -1,6 +1,6 @@
-"use client";
+'use client'
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 /**
  * useLongPress Hook
@@ -8,32 +8,32 @@ import { useState, useRef, useCallback, useEffect } from "react";
  * Centered on providing a consistent "entry to selection mode" experience.
  */
 export function useLongPress(callback: () => void, ms = 500) {
-    const [startLongPress, setStartLongPress] = useState(false);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const [startLongPress, setStartLongPress] = useState(false)
+    const timerRef = useRef<NodeJS.Timeout | null>(null)
 
     const start = useCallback(() => {
-        setStartLongPress(true);
-    }, []);
+        setStartLongPress(true)
+    }, [])
 
     const stop = useCallback(() => {
-        setStartLongPress(false);
-        if (timerRef.current) clearTimeout(timerRef.current);
-    }, []);
+        setStartLongPress(false)
+        if (timerRef.current) clearTimeout(timerRef.current)
+    }, [])
 
     useEffect(() => {
         if (startLongPress) {
             timerRef.current = setTimeout(() => {
-                callback();
-                setStartLongPress(false);
-            }, ms);
+                callback()
+                setStartLongPress(false)
+            }, ms)
         } else {
-            if (timerRef.current) clearTimeout(timerRef.current);
+            if (timerRef.current) clearTimeout(timerRef.current)
         }
 
         return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-        };
-    }, [callback, ms, startLongPress]);
+            if (timerRef.current) clearTimeout(timerRef.current)
+        }
+    }, [callback, ms, startLongPress])
 
     return {
         onMouseDown: start,
@@ -42,8 +42,8 @@ export function useLongPress(callback: () => void, ms = 500) {
         onTouchStart: start,
         onTouchEnd: stop,
         onContextMenu: (e: React.MouseEvent) => {
-            e.preventDefault();
-            callback();
+            e.preventDefault()
+            callback()
         },
-    };
+    }
 }

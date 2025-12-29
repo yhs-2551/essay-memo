@@ -1,7 +1,7 @@
-"use client";
+'use client'
 
-import { BlogEditor } from "@/components/blog-editor";
+import { BlogEditor } from '@/components/blog-editor'
 
 export default function NewPostPage() {
-    return <BlogEditor />;
+    return <BlogEditor />
 }

@@ -1,10 +1,10 @@
-console.log(" [System] Switching to Groq Logic...");
+console.log(' [System] Switching to Groq Logic...')
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // --- Configuration ---
-const TEXT_MODEL = "qwen/qwen3-32b";
-const VISUAL_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct";
+const TEXT_MODEL = 'qwen/qwen3-32b'
+const VISUAL_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct'
 
 // --- Prompts ---
 const ANALYST_SYSTEM_PROMPT = `
@@ -40,7 +40,7 @@ IMPORTANT:
 2. These should be the "Best 3 Proposals" derived from the user's situation.
 3. DO NOT provide homework-like tasks.
 4. DO NOT generate the 'insight_ko' field. 
-`;
+`
 
 const PERSONA_PROMPTS: Record<string, string> = {
     prism: `
@@ -133,30 +133,30 @@ const PERSONA_PROMPTS: Record<string, string> = {
 2. 모호함을 견디며 자신만의 의미를 창조하라고 말하세요.
 3. 분량은 공백 포함 300자 내외로 하세요.
 `,
-};
+}
 
 const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 // --- Interfaces ---
 interface AnalyzedData {
-    meta: { model: string; timestamp: string };
-    sentiment: { primaryEmotion_ko: string; primaryEmotion_en: string; intensity: number };
-    philosophy: { lens_ko: string; lens_en: string; summary_ko: string; keywords_en: string[] };
-    life_data: { summary: string; growth_point: string; suggested_actions: string[] };
-    vision: { objects_ko: string[]; objects_en: string[]; mood_ko: string; mood_en: string } | null;
+    meta: { model: string; timestamp: string }
+    sentiment: { primaryEmotion_ko: string; primaryEmotion_en: string; intensity: number }
+    philosophy: { lens_ko: string; lens_en: string; summary_ko: string; keywords_en: string[] }
+    life_data: { summary: string; growth_point: string; suggested_actions: string[] }
+    vision: { objects_ko: string[]; objects_en: string[]; mood_ko: string; mood_en: string } | null
 }
 
 // --- Service Layer ---
 class AIModelService {
-    private apiKey: string;
-    private baseUrl: string;
+    private apiKey: string
+    private baseUrl: string
 
     constructor() {
-        this.apiKey = Deno.env.get("GROQ_API_KEY") || "";
-        this.baseUrl = "https://api.groq.com/openai/v1/chat/completions";
+        this.apiKey = Deno.env.get('GROQ_API_KEY') || ''
+        this.baseUrl = 'https://api.groq.com/openai/v1/chat/completions'
     }
 
     private async callGroq(messages: any[], model: string, jsonMode: boolean = false): Promise<any> {
@@ -164,152 +164,152 @@ class AIModelService {
             model: model,
             messages: messages,
             temperature: 0.5,
-        };
-        if (jsonMode) body.response_format = { type: "json_object" };
+        }
+        if (jsonMode) body.response_format = { type: 'json_object' }
 
         const response = await fetch(this.baseUrl, {
-            method: "POST",
+            method: 'POST',
             headers: {
                 Authorization: `Bearer ${this.apiKey}`,
-                "Content-Type": "application/json",
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify(body),
-        });
+        })
 
         if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`Groq API Error: ${err}`);
+            const err = await response.text()
+            throw new Error(`Groq API Error: ${err}`)
         }
-        return response.json();
+        return response.json()
     }
 
-    async generateCounseling(text: string, imageUrls: string[], tier: "free" | "pro", persona: string = "prism"): Promise<string> {
-        const isVision = tier === "pro" && imageUrls.length > 0;
-        const model = isVision ? VISUAL_MODEL : TEXT_MODEL;
+    async generateCounseling(text: string, imageUrls: string[], tier: 'free' | 'pro', persona: string = 'prism'): Promise<string> {
+        const isVision = tier === 'pro' && imageUrls.length > 0
+        const model = isVision ? VISUAL_MODEL : TEXT_MODEL
 
         // Select prompt based on persona, default to Prism
-        const systemPrompt = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS["prism"];
+        const systemPrompt = PERSONA_PROMPTS[persona] || PERSONA_PROMPTS['prism']
 
         const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Journal Entry: ${text}` },
-        ];
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Journal Entry: ${text}` },
+        ]
 
         if (isVision) {
             // @ts-ignore: Dynamic structure
             messages[1].content = [
-                { type: "text", text: `Journal Entry: ${text}` },
-                ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
-            ];
+                { type: 'text', text: `Journal Entry: ${text}` },
+                ...imageUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ]
         }
 
-        console.log(` [Service] generating Counseling with persona: ${persona}...`);
-        const data = await this.callGroq(messages, model, false);
-        let content = data.choices[0].message.content;
-        content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-        return content;
+        console.log(` [Service] generating Counseling with persona: ${persona}...`)
+        const data = await this.callGroq(messages, model, false)
+        let content = data.choices[0].message.content
+        content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+        return content
     }
 
-    async generateAnalysis(text: string, imageUrls: string[], tier: "free" | "pro"): Promise<AnalyzedData> {
-        const isVision = tier === "pro" && imageUrls.length > 0;
-        const model = isVision ? VISUAL_MODEL : TEXT_MODEL;
+    async generateAnalysis(text: string, imageUrls: string[], tier: 'free' | 'pro'): Promise<AnalyzedData> {
+        const isVision = tier === 'pro' && imageUrls.length > 0
+        const model = isVision ? VISUAL_MODEL : TEXT_MODEL
 
         const messages = [
-            { role: "system", content: ANALYST_SYSTEM_PROMPT },
-            { role: "user", content: `Journal Entry: ${text}` },
-        ];
+            { role: 'system', content: ANALYST_SYSTEM_PROMPT },
+            { role: 'user', content: `Journal Entry: ${text}` },
+        ]
 
         if (isVision) {
             // @ts-ignore: Dynamic structure
             messages[1].content = [
-                { type: "text", text: `Journal Entry: ${text}` },
-                ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
-            ];
+                { type: 'text', text: `Journal Entry: ${text}` },
+                ...imageUrls.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ]
         }
 
-        console.log(` [Service] generating Analysis Data...`);
-        const data = await this.callGroq(messages, model, true);
-        return JSON.parse(data.choices[0].message.content) as AnalyzedData;
+        console.log(` [Service] generating Analysis Data...`)
+        const data = await this.callGroq(messages, model, true)
+        return JSON.parse(data.choices[0].message.content) as AnalyzedData
     }
 }
 
 // --- Main Handler ---
 Deno.serve(async (req) => {
-    if (req.method === "OPTIONS") {
-        return new Response("ok", { headers: corsHeaders });
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders })
     }
 
-    if (req.method === "GET") {
-        return new Response(JSON.stringify({ status: "alive", mode: "groq-native-v2" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    if (req.method === 'GET') {
+        return new Response(JSON.stringify({ status: 'alive', mode: 'groq-native-v2' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
     }
 
     try {
-        const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+        const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
 
-        const payload = await req.json();
-        const { record } = payload;
+        const payload = await req.json()
+        const { record } = payload
 
         if (!record || !record.id || !record.user_id) {
-            console.error(" [Error] Invalid Payload");
-            return new Response(JSON.stringify({ error: "Invalid Payload" }), {
+            console.error(' [Error] Invalid Payload')
+            return new Response(JSON.stringify({ error: 'Invalid Payload' }), {
                 status: 400,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
         }
 
         const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("subscription_tier, preferences")
-            .eq("id", record.user_id)
-            .single();
+            .from('profiles')
+            .select('subscription_tier, preferences')
+            .eq('id', record.user_id)
+            .single()
 
         if (profileError || !profile) {
-            throw new Error("Profile not found");
+            throw new Error('Profile not found')
         }
 
-        const tier = (profile.subscription_tier as "free" | "pro") || "free";
-        const images = (record.images as string[]) || []; // Fix: correctly access images from record
-        const persona = record.persona || "prism"; // Fetch Persona
+        const tier = (profile.subscription_tier as 'free' | 'pro') || 'free'
+        const images = (record.images as string[]) || [] // Fix: correctly access images from record
+        const persona = record.persona || 'prism' // Fetch Persona
 
-        const aiService = new AIModelService();
+        const aiService = new AIModelService()
 
-        console.log(" [System] Starting Parallel AI Execution...");
+        console.log(' [System] Starting Parallel AI Execution...')
         const [counselingText, analysisData] = await Promise.all([
             aiService.generateCounseling(record.content, images, tier, persona),
             aiService.generateAnalysis(record.content, images, tier),
-        ]);
-        console.log(" [System] Parallel Execution Complete.");
+        ])
+        console.log(' [System] Parallel Execution Complete.')
 
         // Inject Persona into metadata for frontend display
         if (analysisData && analysisData.meta) {
             // @ts-ignore: Injecting custom field
-            analysisData.meta.persona = persona;
+            analysisData.meta.persona = persona
         }
 
-        const { error: upsertError } = await supabase.from("consultations").upsert(
+        const { error: upsertError } = await supabase.from('consultations').upsert(
             {
                 post_id: record.id,
                 user_id: record.user_id,
                 analysis: counselingText,
                 analysis_data: analysisData,
             },
-            { onConflict: "post_id" }
-        );
+            { onConflict: 'post_id' }
+        )
 
-        if (upsertError) throw upsertError;
+        if (upsertError) throw upsertError
 
         return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
     } catch (error: any) {
-        console.error(" [Error] Handler Fatal:", error);
+        console.error(' [Error] Handler Fatal:', error)
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
     }
-});
+})
 
-console.log(" [System] Groq Server Ready");
+console.log(' [System] Groq Server Ready')

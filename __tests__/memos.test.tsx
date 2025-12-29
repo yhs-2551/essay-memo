@@ -1,14 +1,14 @@
-import { vi } from "vitest";
+import { vi } from 'vitest'
 
 // Mock dependencies
-vi.mock("@/components/background", () => ({
-    Background: ({ children }: { children: React.ReactNode }) => <div data-testid='background'>{children}</div>,
-}));
+vi.mock('@/components/background', () => ({
+    Background: ({ children }: { children: React.ReactNode }) => <div data-testid="background">{children}</div>,
+}))
 
-vi.mock("next/link", () => ({
+vi.mock('next/link', () => ({
     default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+}))
 
-vi.mock("next-themes", () => ({
-    useTheme: () => ({ theme: "dark" }),
-}));
+vi.mock('next-themes', () => ({
+    useTheme: () => ({ theme: 'dark' }),
+}))

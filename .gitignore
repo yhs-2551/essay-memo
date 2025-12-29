@@ -34,5 +34,8 @@ pnpm-debug.log*
 # npm
 .npmrc
 
+# prettierrc 
+.prettierrc
+
 # txt
 next.txt
