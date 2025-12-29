@@ -211,32 +211,42 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
         setIsBulkDelete(true)
     }
 
+    // ===== Helper Functions (Clean Code: SRP) =====
+
+    const executeSingleMemoDelete = async (id: string) => {
+        const res = await fetch(`/api/memos/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Delete failed')
+        setMemos(memos.filter((m) => m.id !== id))
+        if (selectedIds.has(id)) toggleSelect(id)
+    }
+
+    const executeBulkMemoDelete = async (ids: string[]) => {
+        const res = await fetch('/api/memos/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        })
+        if (!res.ok) throw new Error('Bulk delete failed')
+        setMemos(memos.filter((m) => !selectedIds.has(m.id)))
+        clearSelection()
+    }
+
+    // ===== Main Delete Handler (Orchestrator with Early Return) =====
+
     const executeDelete = async () => {
+        // Guard: No target
+        if (!isBulkDelete && !deleteTargetId) return
+
         try {
             if (isBulkDelete) {
                 const ids = Array.from(selectedIds)
-                const res = await fetch('/api/memos/bulk-delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids }),
-                })
-                if (res.ok) {
-                    setMemos(memos.filter((m) => !selectedIds.has(m.id)))
-                    clearSelection()
-                    toast.success(`${ids.length}개의 단상이 삭제되었습니다.`)
-                } else {
-                    throw new Error('Bulk delete failed')
-                }
-            } else if (deleteTargetId) {
-                const res = await fetch(`/api/memos/${deleteTargetId}`, { method: 'DELETE' })
-                if (res.ok) {
-                    setMemos(memos.filter((m) => m.id !== deleteTargetId))
-                    if (selectedIds.has(deleteTargetId)) toggleSelect(deleteTargetId)
-                    toast.success('단상이 삭제되었습니다.')
-                } else {
-                    throw new Error('Delete failed')
-                }
+                await executeBulkMemoDelete(ids)
+                toast.success(`${ids.length}개 항목이 삭제되었습니다.`)
+                return
             }
+
+            await executeSingleMemoDelete(deleteTargetId!)
+            toast.success('단상이 삭제되었습니다.')
         } catch (e) {
             console.error(e)
             toast.error('삭제 중 오류가 발생했습니다.')

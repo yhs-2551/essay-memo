@@ -164,33 +164,41 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
         setIsBulkDelete(true)
     }
 
+    // ===== Helper Functions (Clean Code: SRP) =====
+
+    const executeSingleDelete = async (id: string) => {
+        const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Delete failed')
+        setPosts((prev) => prev.filter((p) => p.id !== id))
+    }
+
+    const executeBulkDelete = async (ids: string[]) => {
+        const res = await fetch('/api/posts/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        })
+        if (!res.ok) throw new Error('Bulk delete failed')
+        setPosts((prev) => prev.filter((p) => !ids.includes(p.id)))
+        clearSelection()
+    }
+
+    // ===== Main Delete Handler (Orchestrator with Early Return) =====
+
     const executeDelete = async () => {
+        // Guard: No target
+        if (!isBulkDelete && !deleteTargetId) return
+
         try {
             if (isBulkDelete) {
                 const ids = Array.from(selectedIds)
-                const res = await fetch('/api/posts/bulk-delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids }),
-                })
-
-                if (res.ok) {
-                    setPosts((prev) => prev.filter((p) => !ids.includes(p.id)))
-                    clearSelection()
-                    toast.success('선택한 글들이 삭제되었습니다.')
-                } else {
-                    throw new Error('Bulk delete failed')
-                }
-            } else if (deleteTargetId) {
-                const res = await fetch(`/api/posts/${deleteTargetId}`, { method: 'DELETE' })
-
-                if (res.ok) {
-                    setPosts((prev) => prev.filter((p) => p.id !== deleteTargetId))
-                    toast.success('글이 삭제되었습니다.')
-                } else {
-                    throw new Error('Delete failed')
-                }
+                await executeBulkDelete(ids)
+                toast.success(`${ids.length}개 항목이 삭제되었습니다.`)
+                return
             }
+
+            await executeSingleDelete(deleteTargetId!)
+            toast.success('글이 삭제되었습니다.')
         } catch (error) {
             console.error(error)
             toast.error('삭제 중 오류가 발생했습니다.')

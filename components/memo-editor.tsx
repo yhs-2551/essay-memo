@@ -78,8 +78,11 @@ export function MemoEditor({
         if (!content.trim()) return
         setLoading(true)
         try {
-            const finalContent =
-                uploadedImages.length > 0 ? `${content}\n\n${uploadedImages.map((url) => `![이미지](${url})`).join('\n')}` : content
+            // [Clean Code] Extract complex ternary to variables
+            const hasImages = uploadedImages.length > 0
+            const imageMarkdown = uploadedImages.map((url) => `![이미지](${url})`).join('\n')
+            const finalContent = hasImages ? `${content}\n\n${imageMarkdown}` : content
+
             await onSave(finalContent)
             clearDraft() // [Orbit Sync]: Clear draft after successful save
             if (!initialContent) {

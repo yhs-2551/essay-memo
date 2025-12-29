@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { logActivity } from '@/lib/logger'
+import { UI_CONFIG } from '@/lib/constants'
 
 const app = new Hono()
 
@@ -11,7 +12,7 @@ app.get('/', async (c) => {
     const supabase = await createClient()
     const query = c.req.query('q')
     const page = parseInt(c.req.query('page') || '1')
-    const limit = parseInt(c.req.query('limit') || '20')
+    const limit = parseInt(c.req.query('limit') || String(UI_CONFIG.PAGINATION_LIMIT))
     const from = (page - 1) * limit
     const to = from + limit - 1
 
