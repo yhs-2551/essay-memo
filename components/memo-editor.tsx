@@ -111,6 +111,11 @@ export function MemoEditor({
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     onPaste={async (e) => {
+                        // [Policy] Memo: Max 5 images
+                        if (uploadedImages.length >= 5) {
+                            toast.error('단상에는 최대 5장까지만 첨부할 수 있습니다.')
+                            return
+                        }
                         const url = await handlePaste(e)
                         if (url) setUploadedImages((prev) => [...prev, url])
                     }}
@@ -127,7 +132,10 @@ export function MemoEditor({
                             className="hover:bg-primary/10 text-muted-foreground"
                             size="icon"
                             variant="ghost"
+                            label={uploadedImages.length >= 5 ? '최대 5장' : undefined}
+                            disabled={uploadedImages.length >= 5}
                         />
+                        <span className="text-xs text-muted-foreground/50 self-center ml-1">{uploadedImages.length}/5</span>
                     </div>
                     <div className="flex gap-2">
                         {onCancel && (

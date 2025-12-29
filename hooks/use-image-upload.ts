@@ -21,9 +21,9 @@ export const useImageUpload = (bucketName: string = 'user_uploads'): UseImageUpl
                 return null
             }
 
-            // Limit size to 10MB
-            if (file.size > 10 * 1024 * 1024) {
-                toast.error('10MB 이하의 이미지만 업로드 가능합니다.')
+            // Limit size to 5MB (Pro Limit)
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('5MB 이하의 이미지만 업로드 가능합니다.')
                 return null
             }
 

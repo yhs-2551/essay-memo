@@ -324,7 +324,13 @@ Deno.serve(async (req) => {
         }
 
         const tier = (profile.subscription_tier as 'free' | 'pro') || 'free'
-        const images = (record.images as string[]) || [] // Fix: correctly access images from record
+        // [Cost Control] Limit AI vision context to first 5 images only (Balanced for Pro)
+        const allImages = (record.images as string[]) || []
+        const images = allImages.slice(0, 5)
+
+        if (allImages.length > 5) {
+            console.log(` [System] Image limit applied: ${allImages.length} -> 5`)
+        }
         const persona = record.persona || 'prism' // Fetch Persona
 
         const aiService = new AIModelService()

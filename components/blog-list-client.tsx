@@ -125,7 +125,8 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
     const [loadingMore, setLoadingMore] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [page, setPage] = useState(1)
-    const [hasMore, setHasMore] = useState(true)
+    const [hasMore, setHasMore] = useState(initialPosts.length >= 20) // Correct initial state
+    const [error, setError] = useState(false) // Added error state
     const [dateFilter, setDateFilter] = useState<string>('') // "YYYY-MM"
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
     const [isBulkDelete, setIsBulkDelete] = useState(false)
@@ -149,74 +150,77 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
     // Avoid re-fetching page 1 if initial data is there and no query change
     const isFirstRender = useRef(true)
 
-    useEffect(() => {
-        let isMounted = true
+    const fetchPosts = async (pageNum: number, query: string) => {
+        try {
+            setError(false) // Reset error on new attempt
+            if (pageNum === 1) setFetching(true)
+            else setLoadingMore(true)
 
-        // Skip initial fetch on mount if we have data & page 1 & no query
-        if (isFirstRender.current && page === 1 && !searchQuery) {
+            const params = new URLSearchParams()
+            if (query) params.append('q', query)
+            if (pageNum > 1) params.append('page', pageNum.toString())
+
+            const res = await fetch(`/api/posts?${params.toString()}`)
+            if (!res.ok) throw new Error('Failed to fetch posts')
+
+            const data = await res.json()
+
+            if (pageNum === 1) {
+                setPosts(data.posts || [])
+            } else {
+                setPosts((prev) => [...prev, ...(data.posts || [])])
+            }
+            setHasMore(data.hasMore)
+        } catch (err) {
+            console.error(err)
+            setError(true) // Enable "Retry" UI, Disable "Infinite Loop"
+            toast.error('기록을 불러오지 못했습니다.')
+        } finally {
+            setFetching(false)
+            setLoadingMore(false)
+        }
+    }
+
+    // Search Effect (Debounced)
+    useEffect(() => {
+        // Skip initial fetch on mount if we have data & no query
+        if (isFirstRender.current && !searchQuery) {
             isFirstRender.current = false
             return
         }
 
-        const fetchPosts = async () => {
-            try {
-                if (page === 1) setFetching(true) // Only full loader for filter/search changes
-                else setLoadingMore(true) // Mini loader for infinite scroll
-
-                const params = new URLSearchParams()
-                if (searchQuery) params.append('q', searchQuery)
-                if (page > 1) params.append('page', page.toString())
-
-                const res = await fetch(`/api/posts?${params.toString()}`)
-                if (!res.ok) throw new Error('Failed to fetch posts')
-
-                const data = await res.json()
-                if (isMounted) {
-                    if (page === 1) {
-                        setPosts(data.posts || [])
-                    } else {
-                        setPosts((prev) => [...prev, ...(data.posts || [])])
-                    }
-                    setHasMore(data.hasMore)
-                }
-            } catch (error) {
-                console.error(error)
-                if (isMounted) toast.error('기록을 불러오지 못했습니다.')
-            } finally {
-                if (isMounted) {
-                    setFetching(false)
-                    setLoadingMore(false)
-                }
-            }
-        }
-
         const debounceTimer = setTimeout(() => {
-            fetchPosts()
+            setPage(1) // Always reset to page 1 on search
+            fetchPosts(1, searchQuery)
         }, 300)
 
-        return () => {
-            isMounted = false
-            clearTimeout(debounceTimer)
-        }
-    }, [searchQuery, page])
+        return () => clearTimeout(debounceTimer)
+    }, [searchQuery])
+
+    // Pagination Effect (Immediate)
+    useEffect(() => {
+        if (page === 1) return // Already handled by search/mount
+        if (error) return // Don't auto-fetch on error
+        fetchPosts(page, searchQuery)
+    }, [page])
 
     // Infinite Scroll Observer
     useEffect(() => {
+        if (!hasMore || fetching || loadingMore || error) return // Stop if Error
+
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries[0].isIntersecting && hasMore && !fetching && !loadingMore) {
+                if (entries[0].isIntersecting) {
                     setPage((prev) => prev + 1)
                 }
             },
-            { threshold: 1.0 }
+            { threshold: 0.1, rootMargin: '100px' }
         )
 
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current)
-        }
+        if (observerTarget.current) observer.observe(observerTarget.current)
 
         return () => observer.disconnect()
-    }, [hasMore, fetching, loadingMore])
+    }, [hasMore, fetching, loadingMore, page, searchQuery, error])
 
     const handleDelete = (postId: string) => {
         setDeleteTargetId(postId)
@@ -293,8 +297,7 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
                                 size="default"
                                 className="rounded-2xl shadow-xl shadow-primary/10 transition-all hover:scale-105 md:h-11 md:px-8"
                             >
-                                <Plus className="mr-2 h-5 w-5" /> <span className="hidden xs:inline">새 에세이</span>
-                                <span className="inline xs:hidden">쓰기</span>
+                                <Plus className="mr-2 h-5 w-5" /> 새 에세이
                             </Button>
                         </Link>
                     </div>
@@ -361,7 +364,22 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
                                         <span className="text-xs font-medium text-muted-foreground/60">더 많은 내용을 불러오는 중...</span>
                                     </div>
                                 )}
-                                {!hasMore && groups.length > 0 && (
+
+                                {error && (
+                                    <div className="flex flex-col items-center animate-in fade-in">
+                                        <p className="text-muted-foreground/70 mb-3 text-sm">잠시 연결이 끊어졌어요 💫</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => fetchPosts(page, searchQuery)}
+                                            className="bg-primary/5 hover:bg-primary/10 text-primary rounded-full px-6"
+                                        >
+                                            <Loader2 className="w-3 h-3 mr-2" /> 다시 시도
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {!hasMore && !error && groups.length > 0 && (
                                     <div className="flex flex-col items-center gap-4 opacity-40">
                                         <div className="w-20 h-px bg-gradient-to-r from-transparent via-muted-foreground/50 to-transparent" />
                                         <div className="text-xs font-medium text-muted-foreground/60">마지막 페이지입니다</div>

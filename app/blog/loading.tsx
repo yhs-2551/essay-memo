@@ -19,9 +19,7 @@ export default function Loading() {
                         <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-muted to-muted/50 tracking-tight animate-pulse">
                             에세이 (Essay)
                         </h1>
-                        <Button variant="default" size="lg" disabled className="rounded-2xl opacity-50">
-                            <Plus className="mr-2 h-5 w-5" /> 새 에세이
-                        </Button>
+                        <div className="w-24 md:w-32 h-11 bg-muted/20 rounded-2xl animate-pulse" />
                     </div>
 
                     <div className="flex flex-col gap-4">

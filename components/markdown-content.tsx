@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog'
-import Image from 'next/image'
-import { Maximize2 } from 'lucide-react'
+import { ZoomableImage } from '@/components/zoomable-image'
 
 interface MarkdownContentProps {
     content: string
@@ -52,30 +50,9 @@ export function MarkdownContent({ content, className = '' }: MarkdownContentProp
             const url = part
 
             elements.push(
-                <Dialog key={`img-${i}`}>
-                    <DialogTrigger asChild>
-                        <div className="relative group cursor-zoom-in my-2 inline-block">
-                            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-muted transition-all group-hover:ring-2 group-hover:ring-primary/50 shadow-sm">
-                                <Image
-                                    src={url}
-                                    alt={alt}
-                                    fill
-                                    className="object-cover"
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
-                                    <Maximize2 className="text-white w-5 h-5 shadow-sm" />
-                                </div>
-                            </div>
-                        </div>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-2xl">
-                        <DialogTitle className="sr-only">이미지 확대 보기</DialogTitle>
-                        <div className="relative w-full h-[80vh]">
-                            <Image src={url} alt={alt} fill className="object-contain" sizes="90vw" />
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <div key={`img-${i}`} className="my-2 inline-block">
+                    <ZoomableImage src={url} alt={alt} className="w-32 h-32" />
+                </div>
             )
         }
     }

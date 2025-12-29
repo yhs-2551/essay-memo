@@ -14,6 +14,7 @@ import { Activity, ArrowLeft, CheckCircle2, Quote, Sparkles, Stars } from 'lucid
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { GalleryLightbox } from '@/components/gallery-lightbox' // Replaced ZoomableImage with Lightbox for Gallery
 
 type PostData = {
     post: {
@@ -125,11 +126,16 @@ export default function PostPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen p-6 relative flex items-center justify-center">
                 <Background />
-                <div className="text-center animate-pulse">
-                    <Stars className="h-10 w-10 mx-auto mb-4 text-purple-500" />
-                    <p>분석 중입니다...</p>
+                <div className="max-w-4xl w-full mx-auto space-y-8 animate-pulse">
+                    {/* Header Placeholder */}
+                    <div className="flex justify-between items-center mb-12">
+                        <div className="h-10 w-32 bg-muted/20 rounded-full" />
+                        <div className="h-9 w-24 bg-muted/20 rounded-full" />
+                    </div>
+                    {/* Content Skeleton */}
+                    <div className="p-8 bg-background/40 backdrop-blur-md rounded-xl border border-white/10 h-[60vh]" />
                 </div>
             </div>
         )
@@ -170,19 +176,7 @@ export default function PostPage() {
                 <Card className="p-8 bg-background/60 backdrop-blur-md shadow-sm border-none">
                     {/* Images Gallery */}
                     {data.post.images && Array.isArray(data.post.images) && data.post.images.length > 0 && (
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            {data.post.images.map((url, i) => (
-                                <div key={i} className="relative aspect-video rounded-2xl overflow-hidden shadow-sm bg-black/5">
-                                    <Image
-                                        src={url}
-                                        alt={`Gallery ${i}`}
-                                        fill
-                                        className="object-cover hover:scale-105 transition-transform duration-500"
-                                        sizes="(max-width: 768px) 100vw, 50vw"
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                        <GalleryLightbox images={data.post.images} />
                     )}
 
                     <h1 className="text-3xl md:text-4xl font-bold mb-4">{data.post.title}</h1>

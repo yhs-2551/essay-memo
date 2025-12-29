@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { SearchInput } from '@/components/ui/search-input'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -132,53 +133,32 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
     const [loadingMore, setLoadingMore] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [page, setPage] = useState(1)
-    const [hasMore, setHasMore] = useState(true)
+    const [hasMore, setHasMore] = useState(initialMemos.length >= 20) // Correct initial state
+    const [error, setError] = useState(false) // Added error state
     const [dateFilter, setDateFilter] = useState<string>('') // "YYYY-MM"
     const { theme } = useTheme()
     const observerTarget = useRef<HTMLDivElement>(null)
 
     const { selectedIds, toggleSelect, selectAll, clearSelection, isSelected } = useSelection(memos)
 
+    // Delete Modal State
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+    const [isBulkDelete, setIsBulkDelete] = useState(false)
+
+    // Only fetch if query changes or page > 1 (pagination)
+    // Avoid re-fetching page 1 if initial data is there and no query change
     const isFirstRender = useRef(true)
 
-    useEffect(() => {
-        // Skip initial fetch on mount if we have data & page 1 & no query
-        if (isFirstRender.current && page === 1 && !searchQuery) {
-            isFirstRender.current = false
-            return
-        }
-
-        setPage(1)
-        setMemos([])
-        fetchMemos(1, searchQuery)
-    }, [searchQuery])
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !fetching && !loadingMore) {
-                    const nextPage = page + 1
-                    setPage(nextPage)
-                    fetchMemos(nextPage, searchQuery)
-                }
-            },
-            { threshold: 0.1 }
-        )
-
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current)
-        }
-
-        return () => observer.disconnect()
-    }, [hasMore, fetching, loadingMore, page, searchQuery])
-
-    const fetchMemos = async (pageNum: number, query = '') => {
-        if (pageNum === 1) setFetching(true)
-        else setLoadingMore(true)
-
+    const fetchMemos = async (pageNum: number, query: string) => {
         try {
+            setError(false) // Reset error on new attempt
+            if (pageNum === 1) setFetching(true)
+            else setLoadingMore(true)
+
             const limit = 20
             const res = await fetch(`/api/memos?q=${encodeURIComponent(query)}&page=${pageNum}&limit=${limit}`)
+            if (!res.ok) throw new Error('Failed to fetch memos')
+
             const data = await res.json()
 
             if (data.memos) {
@@ -191,12 +171,56 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
             }
         } catch (e) {
             console.error(e)
-            toast.error('기억을 불러오는데 실패했습니다.')
+            setError(true) // Enable "Retry" UI
+            toast.error('단상을 불러오지 못했습니다.')
         } finally {
             setFetching(false)
             setLoadingMore(false)
         }
     }
+
+    // Search Effect (Debounced)
+    useEffect(() => {
+        // Skip initial fetch on mount if we have data & no query
+        if (isFirstRender.current && !searchQuery) {
+            isFirstRender.current = false
+            return
+        }
+
+        const debounceTimer = setTimeout(() => {
+            setPage(1) // Always reset to page 1 on search
+            fetchMemos(1, searchQuery)
+        }, 300)
+
+        return () => clearTimeout(debounceTimer)
+    }, [searchQuery])
+
+    // Pagination Effect (Immediate)
+    useEffect(() => {
+        if (page === 1) return // Handled by search/mount
+        if (error) return // Don't auto-fetch on error
+        fetchMemos(page, searchQuery)
+    }, [page])
+
+    // Infinite Scroll Observer
+    useEffect(() => {
+        if (!hasMore || fetching || loadingMore || error) return // Stop if Error or no more
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setPage((prev) => prev + 1) // Just update page, effect above will fetch
+                }
+            },
+            { threshold: 0.1, rootMargin: '100px' }
+        )
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current)
+        }
+
+        return () => observer.disconnect()
+    }, [hasMore, fetching, loadingMore, page, searchQuery, error])
 
     // Optimize: Computation
     const filteredMemos = useMemo(() => {
@@ -246,38 +270,47 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        try {
-            const res = await fetch(`/api/memos/${id}`, { method: 'DELETE' })
-            if (res.ok) {
-                setMemos(memos.filter((m) => m.id !== id))
-                if (selectedIds.has(id)) toggleSelect(id)
-                toast.success('단상이 삭제되었습니다.')
-            }
-        } catch (e) {
-            console.error(e)
-            toast.error('삭제 실패')
-        }
+    const handleDelete = (id: string) => {
+        setDeleteTargetId(id)
     }
 
-    const handleBulkDelete = async () => {
-        const ids = Array.from(selectedIds)
-        if (ids.length === 0) return
+    const handleBulkDelete = () => {
+        if (selectedIds.size === 0) return
+        setIsBulkDelete(true)
+    }
 
+    const executeDelete = async () => {
         try {
-            const res = await fetch('/api/memos/bulk-delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids }),
-            })
-            if (res.ok) {
-                setMemos(memos.filter((m) => !selectedIds.has(m.id)))
-                clearSelection()
-                toast.success(`${ids.length}개의 단상이 삭제되었습니다.`)
+            if (isBulkDelete) {
+                const ids = Array.from(selectedIds)
+                const res = await fetch('/api/memos/bulk-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids }),
+                })
+                if (res.ok) {
+                    setMemos(memos.filter((m) => !selectedIds.has(m.id)))
+                    clearSelection()
+                    toast.success(`${ids.length}개의 단상이 삭제되었습니다.`)
+                } else {
+                    throw new Error('Bulk delete failed')
+                }
+            } else if (deleteTargetId) {
+                const res = await fetch(`/api/memos/${deleteTargetId}`, { method: 'DELETE' })
+                if (res.ok) {
+                    setMemos(memos.filter((m) => m.id !== deleteTargetId))
+                    if (selectedIds.has(deleteTargetId)) toggleSelect(deleteTargetId)
+                    toast.success('단상이 삭제되었습니다.')
+                } else {
+                    throw new Error('Delete failed')
+                }
             }
         } catch (e) {
             console.error(e)
-            toast.error('일괄 삭제 실패')
+            toast.error('삭제 중 오류가 발생했습니다.')
+        } finally {
+            setDeleteTargetId(null)
+            setIsBulkDelete(false)
         }
     }
 
@@ -366,15 +399,30 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
                                 </div>
                             ))}
 
-                            {/* Infinite Scroll Trigger */}
-                            <div ref={observerTarget} className="h-40 flex items-center justify-center gap-4">
+                            {/* Infinite Scroll Trigger & Error Recovery */}
+                            <div ref={observerTarget} className="h-40 flex flex-col items-center justify-center gap-4">
                                 {loadingMore && (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground opacity-60">
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                         <span>더 많은 기억을 불러오는 중...</span>
                                     </div>
                                 )}
-                                {!hasMore && groups.length > 0 && (
+
+                                {error && (
+                                    <div className="flex flex-col items-center animate-in fade-in">
+                                        <p className="text-muted-foreground/70 mb-3 text-sm">잠시 연결이 끊어졌어요 💫</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => fetchMemos(page, searchQuery)}
+                                            className="bg-primary/5 hover:bg-primary/10 text-primary rounded-full px-6"
+                                        >
+                                            <Loader2 className="w-3 h-3 mr-2" /> 다시 시도
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {!hasMore && !error && groups.length > 0 && (
                                     <div className="flex flex-col items-center gap-4 opacity-40">
                                         <div className="w-20 h-px bg-gradient-to-r from-transparent via-muted-foreground/50 to-transparent" />
                                         <div className="text-xs font-medium text-muted-foreground/60">마지막 페이지입니다</div>
@@ -396,7 +444,42 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
             <FeatureDiscovery />
 
-            {/* Removed EditModal integration */}
+            {/* Remove EditModal comment */}
+
+            <Dialog
+                open={!!deleteTargetId || isBulkDelete}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setDeleteTargetId(null)
+                        setIsBulkDelete(false)
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>단상 삭제</DialogTitle>
+                        <DialogDescription>
+                            {isBulkDelete
+                                ? `선택한 ${selectedIds.size}개의 단상을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+                                : '정말 이 단상을 삭제하시겠습니까? 삭제된 단상은 복구할 수 없습니다.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setDeleteTargetId(null)
+                                setIsBulkDelete(false)
+                            }}
+                        >
+                            취소
+                        </Button>
+                        <Button variant="destructive" onClick={executeDelete}>
+                            삭제
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

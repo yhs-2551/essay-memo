@@ -23,7 +23,10 @@ app.get('/', async (c) => {
 
     const { data, error, count } = await dbQuery
 
-    if (error) return c.json({ error: error.message }, 500)
+    if (error) {
+        console.error('[API] Posts Fetch Error:', error)
+        return c.json({ error: error.message }, 500)
+    }
 
     return c.json({
         posts: data,

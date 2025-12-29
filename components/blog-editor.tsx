@@ -127,6 +127,11 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
             return
         }
 
+        if (willAnalyze && uploadedImages.length > 5) {
+            // [Quantum UX] Frame limitation as 'Focus' for consciousness improvement
+            toast.info('깊이 있는 통찰을 위해, AI는 가장 중요한 첫 5장의 시각적 기억에 집중합니다.', { duration: 5000 })
+        }
+
         setLoading(true)
         try {
             // [CHANGED] Images are now sent separately, not embedded in markdown
