@@ -73,8 +73,19 @@ app.post(
         const { title, content, mode, is_published, images } = c.req.valid('json')
         const supabase = await createClient()
 
+        // [FIX] Get authenticated user for RLS compliance
+        const {
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+            return c.json({ error: 'Unauthorized: Please log in' }, 401)
+        }
+
+        // [FIX] Include user_id for RLS policy: auth.uid() = user_id
         const { data, error } = await (supabase.from('posts') as any)
-            .insert({ title, content, mode, is_published, images })
+            .insert({ title, content, mode, is_published, images, user_id: user.id })
             .select()
             .single()
 
@@ -103,7 +114,16 @@ app.patch(
         const id = c.req.param('id')
         const body = c.req.valid('json')
         const supabase = await createClient()
-        const { data, error } = await (supabase.from('posts') as any).update(body).eq('id', id).select().single()
+
+        // [FIX] Auth check for RLS
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+            return c.json({ error: 'Unauthorized: Please log in' }, 401)
+        }
+
+        const { data, error, count } = await (supabase.from('posts') as any).update(body).eq('id', id).select().single()
 
         if (error) return c.json({ error: error.message }, 500)
 
@@ -116,9 +136,27 @@ app.patch(
 app.delete('/:id', async (c) => {
     const id = c.req.param('id')
     const supabase = await createClient()
-    const { error } = await supabase.from('posts').delete().eq('id', id)
+
+    // [DEBUG] Check authenticated user
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser()
+    console.log('[API] delete/:id - User:', user?.id || 'NOT AUTHENTICATED', 'PostId:', id)
+
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Not logged in' }, 401)
+    }
+
+    const { error, count } = await supabase.from('posts').delete({ count: 'exact' }).eq('id', id)
+
+    console.log('[API] delete/:id - Deleted count:', count, 'Error:', error?.message || 'none')
 
     if (error) return c.json({ error: error.message }, 500)
+
+    if (count === 0) {
+        return c.json({ error: 'Post not found or you do not have permission to delete it.' }, 403)
+    }
 
     await logActivity('POST_DELETE', { postId: id })
 
@@ -128,13 +166,32 @@ app.delete('/:id', async (c) => {
 app.post('/bulk-delete', zValidator('json', z.object({ ids: z.array(z.string().uuid()) })), async (c) => {
     const { ids } = c.req.valid('json')
     const supabase = await createClient()
-    const { error } = await supabase.from('posts').delete().in('id', ids)
+
+    // [DEBUG] Check authenticated user
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser()
+    console.log('[API] bulk-delete - User:', user?.id || 'NOT AUTHENTICATED', 'AuthError:', authError?.message || 'none')
+
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Not logged in' }, 401)
+    }
+
+    const { error, count } = await supabase.from('posts').delete({ count: 'exact' }).in('id', ids)
+
+    console.log('[API] bulk-delete - Deleted count:', count, 'Error:', error?.message || 'none')
 
     if (error) return c.json({ error: error.message }, 500)
 
+    if (count === 0) {
+        console.log('[API] bulk-delete - WARNING: 0 rows deleted. RLS policy may be blocking.')
+        return c.json({ error: 'No posts were deleted. You may not have permission.' }, 403)
+    }
+
     await logActivity('POST_DELETE', { count: ids.length, bulk: true })
 
-    return c.json({ success: true })
+    return c.json({ success: true, deletedCount: count })
 })
 
 export const posts = app

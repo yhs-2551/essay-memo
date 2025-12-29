@@ -103,9 +103,14 @@ export function MemoEditor({
     return (
         <Card className={`overflow-hidden transition-all border-none bg-background/60 backdrop-blur-xl shadow-2xl ${className}`}>
             <div className="p-4 relative">
-                {/* [Orbit Sync]: Saving Indicator */}
-                <div className="absolute top-4 right-4 text-[10px] font-medium text-muted-foreground/50 transition-opacity duration-500">
-                    {isSaving ? '저장 중...' : '저장됨'}
+                {/* [Orbit Sync]: Minimalist Saving Indicator (@rules: 미니멀, 비침입적 UX) */}
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 transition-opacity duration-500">
+                    <div
+                        className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                            isSaving ? 'bg-primary/70 animate-pulse' : 'bg-emerald-500/60'
+                        }`}
+                    />
+                    <span className="text-[10px] font-medium text-muted-foreground/40">{isSaving ? '동기화' : '저장됨'}</span>
                 </div>
 
                 <Textarea

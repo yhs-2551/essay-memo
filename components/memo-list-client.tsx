@@ -301,17 +301,18 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
                 <div className="space-y-4 pb-20">
                     {fetching && memos.length === 0 ? (
                         <MemoListSkeleton count={4} />
+                    ) : memos.length === 0 ? (
+                        <EmptyState
+                            icon={Sparkles}
+                            title="기억된 순간이 없습니다"
+                            description="지금 머릿속에 떠오르는 영감을 붙잡아두세요."
+                            className="py-12"
+                        />
                     ) : groups.length === 0 ? (
                         <EmptyState
-                            icon={searchQuery || dateFilter ? Search : Sparkles}
-                            title={searchQuery || dateFilter ? '검색 결과가 없습니다' : '기억된 순간이 없습니다'}
-                            description={
-                                searchQuery || dateFilter ? '다른 키워드로 다시 찾아보세요.' : '지금 머릿속에 떠오르는 영감을 붙잡아두세요.'
-                            }
-                            // Memos have the editor right there, so maybe no button, or a button that focuses the input?
-                            // For simplicity, maybe just "Write a memo" pointing to input?
-                            // Actually the input is always visible at the top. So maybe no CTA is needed, or "Record one above".
-                            // Let's omit CTA for memos as the input is sticky/prominent.
+                            icon={Search}
+                            title="검색 결과가 없습니다"
+                            description="다른 키워드로 다시 찾아보세요."
                             className="py-12"
                         />
                     ) : (

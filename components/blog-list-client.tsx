@@ -298,49 +298,59 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
                                 </div>
                             ))}
 
-                            <div ref={observerTarget} className="h-40 flex flex-col items-center justify-center gap-4">
-                                {loadingMore && (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
-                                        <span className="text-xs font-medium text-muted-foreground/60">더 많은 내용을 불러오는 중...</span>
-                                    </div>
-                                )}
+                            {/* Infinite Scroll Observer - Only show when posts exist */}
+                            {posts.length > 0 && (
+                                <div ref={observerTarget} className="h-40 flex flex-col items-center justify-center gap-4">
+                                    {loadingMore && (
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Loader2 className="w-6 h-6 animate-spin text-primary/40" />
+                                            <span className="text-xs font-medium text-muted-foreground/60">
+                                                더 많은 내용을 불러오는 중...
+                                            </span>
+                                        </div>
+                                    )}
 
-                                {error && (
-                                    <div className="flex flex-col items-center animate-in fade-in">
-                                        <p className="text-muted-foreground/70 mb-3 text-sm">잠시 연결이 끊어졌어요 💫</p>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={refreshItems}
-                                            className="bg-primary/5 hover:bg-primary/10 text-primary rounded-full px-6"
-                                        >
-                                            <Loader2 className="w-3 h-3 mr-2" /> 다시 시도
-                                        </Button>
-                                    </div>
-                                )}
+                                    {error && (
+                                        <div className="flex flex-col items-center animate-in fade-in">
+                                            <p className="text-muted-foreground/70 mb-3 text-sm">잠시 연결이 끊어졌어요 💫</p>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={refreshItems}
+                                                className="bg-primary/5 hover:bg-primary/10 text-primary rounded-full px-6"
+                                            >
+                                                <Loader2 className="w-3 h-3 mr-2" /> 다시 시도
+                                            </Button>
+                                        </div>
+                                    )}
 
-                                {!hasMore && !error && groups.length > 0 && (
-                                    <div className="flex flex-col items-center gap-4 opacity-40">
-                                        <div className="w-20 h-px bg-gradient-to-r from-transparent via-muted-foreground/50 to-transparent" />
-                                        <div className="text-xs font-medium text-muted-foreground/60">마지막 페이지입니다</div>
-                                    </div>
-                                )}
-                                {groups.length === 0 && (
-                                    <EmptyState
-                                        icon={searchQuery || dateFilter ? Search : BookOpen}
-                                        title={searchQuery || dateFilter ? '검색 결과가 없습니다' : '아직 기록된 이야기가 없습니다'}
-                                        description={
-                                            searchQuery || dateFilter
-                                                ? '다른 키워드나 날짜로 다시 검색해보세요.'
-                                                : '당신의 일상, 생각, 그리고 감정을 우주에 기록해보세요.'
-                                        }
-                                        actionLabel={!searchQuery && !dateFilter ? '첫 에세이 쓰기' : undefined}
-                                        onAction={() => router.push('/blog/new')}
-                                        className="py-20"
-                                    />
-                                )}
-                            </div>
+                                    {!hasMore && !error && groups.length > 0 && (
+                                        <div className="flex flex-col items-center gap-4 opacity-40">
+                                            <div className="w-20 h-px bg-gradient-to-r from-transparent via-muted-foreground/50 to-transparent" />
+                                            <div className="text-xs font-medium text-muted-foreground/60">마지막 페이지입니다</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* EmptyState - Shows when no posts with proper margin */}
+                            {posts.length === 0 && !fetching && (
+                                <EmptyState
+                                    icon={BookOpen}
+                                    title="아직 기록된 이야기가 없습니다"
+                                    description="당신의 일상, 생각, 그리고 감정을 우주에 기록해보세요."
+                                    className="py-16 mt-6"
+                                />
+                            )}
+
+                            {groups.length === 0 && posts.length > 0 && !fetching && (
+                                <EmptyState
+                                    icon={Search}
+                                    title="검색 결과가 없습니다"
+                                    description="다른 키워드나 날짜로 다시 검색해보세요."
+                                    className="py-16 mt-6"
+                                />
+                            )}
                         </>
                     )}
                 </div>
