@@ -149,6 +149,9 @@ export interface Database {
                 }
             }
         }
+        Views: {
+            [_ in never]: never
+        }
         Functions: {
             check_rate_limit: {
                 Args: {
@@ -158,6 +161,12 @@ export interface Database {
                 }
                 Returns: boolean
             }
+        }
+        Enums: {
+            [_ in never]: never
+        }
+        CompositeTypes: {
+            [_ in never]: never
         }
     }
 }

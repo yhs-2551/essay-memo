@@ -249,6 +249,10 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                     value={content}
                                     onChange={(e) => setContent(e.target.value)}
                                     onPaste={async (e) => {
+                                        if (uploadedImages.length >= 20) {
+                                            toast.error('이미지는 최대 20개까지만 첨부할 수 있습니다.')
+                                            return
+                                        }
                                         const url = await handlePaste(e)
                                         if (url) setUploadedImages((prev) => [...prev, url])
                                     }}
@@ -261,7 +265,8 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                         variant="ghost"
                                         className="text-muted-foreground hover:text-primary"
                                         onUploadComplete={(url) => setUploadedImages((prev) => [...prev, url])}
-                                        label="이미지 첨부"
+                                        label={uploadedImages.length >= 20 ? '이미지 첨부 제한 도달 (최대 20개)' : '이미지 첨부'}
+                                        disabled={uploadedImages.length >= 20}
                                     />
                                 </div>
                             </Card>

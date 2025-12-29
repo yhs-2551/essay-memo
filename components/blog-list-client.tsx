@@ -20,6 +20,8 @@ import { groupItemsByDate, getAvailableDates } from '@/lib/date-utils'
 import { useSelection } from '@/hooks/use-selection'
 import { MarkdownContent } from '@/components/markdown-content'
 import { Post } from '@/lib/types'
+import { PostListSkeleton } from '@/components/skeletons'
+import { EmptyState } from '@/components/empty-state'
 
 // Re-using local component for now (could be separated)
 function BlogPostItem({
@@ -282,16 +284,17 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
                                 <ArrowLeft className="h-6 w-6" />
                             </Button>
                         </Link>
-                        <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-500/80 via-purple-500/70 to-pink-500/60 dark:from-indigo-400/90 dark:via-purple-400/80 dark:to-pink-400/70 tracking-tight">
+                        <h1 className="text-2xl md:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-500/80 via-purple-500/70 to-pink-500/60 dark:from-indigo-400/90 dark:via-purple-400/80 dark:to-pink-400/70 tracking-tight">
                             에세이 (Essay)
                         </h1>
                         <Link href="/blog/new">
                             <Button
                                 variant={mounted ? (theme === 'dark' ? 'cosmic' : 'cute') : 'default'}
-                                size="lg"
-                                className="rounded-2xl shadow-xl shadow-primary/10 transition-all hover:scale-105"
+                                size="default"
+                                className="rounded-2xl shadow-xl shadow-primary/10 transition-all hover:scale-105 md:h-11 md:px-8"
                             >
-                                <Plus className="mr-2 h-5 w-5" /> 새 에세이
+                                <Plus className="mr-2 h-5 w-5" /> <span className="hidden xs:inline">새 에세이</span>
+                                <span className="inline xs:hidden">쓰기</span>
                             </Button>
                         </Link>
                     </div>
@@ -324,10 +327,7 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
 
                 <div className="space-y-4 pb-32">
                     {fetching && posts.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-50">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                            <div className="text-sm font-medium">에세이를 불러오는 중...</div>
-                        </div>
+                        <PostListSkeleton count={3} />
                     ) : (
                         <>
                             {groups.map((group) => (
@@ -368,12 +368,18 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
                                     </div>
                                 )}
                                 {groups.length === 0 && (
-                                    <div className="text-center text-muted-foreground/50 py-20">
-                                        <Search className="w-16 h-16 mx-auto mb-6 opacity-10" />
-                                        <p className="text-sm font-medium">
-                                            {searchQuery || dateFilter ? '검색 결과가 없습니다' : '작성된 기록이 없습니다'}
-                                        </p>
-                                    </div>
+                                    <EmptyState
+                                        icon={searchQuery || dateFilter ? Search : BookOpen}
+                                        title={searchQuery || dateFilter ? '검색 결과가 없습니다' : '아직 기록된 이야기가 없습니다'}
+                                        description={
+                                            searchQuery || dateFilter
+                                                ? '다른 키워드나 날짜로 다시 검색해보세요.'
+                                                : '당신의 일상, 생각, 그리고 감정을 우주에 기록해보세요.'
+                                        }
+                                        actionLabel={!searchQuery && !dateFilter ? '첫 에세이 쓰기' : undefined}
+                                        onAction={() => router.push('/blog/new')}
+                                        className="py-20"
+                                    />
                                 )}
                             </div>
                         </>

@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { SearchInput } from '@/components/ui/search-input'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { Trash2, ArrowLeft, Loader2, Calendar, Sparkles, BookOpen } from 'lucide-react'
+import { Trash2, ArrowLeft, Loader2, Calendar, Sparkles, BookOpen, Search } from 'lucide-react'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
@@ -20,6 +20,8 @@ import { SelectionBar } from '@/components/selection-bar'
 import { useLongPress } from '@/hooks/use-long-press'
 import { FeatureDiscovery } from '@/components/feature-discovery'
 import { Memo } from '@/lib/types'
+import { MemoListSkeleton } from '@/components/skeletons'
+import { EmptyState } from '@/components/empty-state'
 
 interface MemoItemProps {
     memo: Memo
@@ -323,17 +325,20 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
                 <div className="space-y-4 pb-20">
                     {fetching && memos.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-50">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                            <div className="text-sm font-medium">단상을 불러오는 중...</div>
-                        </div>
+                        <MemoListSkeleton count={4} />
                     ) : groups.length === 0 ? (
-                        <div className="text-center text-muted-foreground py-20 bg-background/30 rounded-2xl border border-dashed border-border/50">
-                            <div className="mb-4 flex justify-center">
-                                <Calendar className="w-12 h-12 opacity-10" />
-                            </div>
-                            <p className="text-sm">{searchQuery || dateFilter ? '검색 결과가 없습니다' : '작성된 기록이 없습니다'}</p>
-                        </div>
+                        <EmptyState
+                            icon={searchQuery || dateFilter ? Search : Sparkles}
+                            title={searchQuery || dateFilter ? '검색 결과가 없습니다' : '기억된 순간이 없습니다'}
+                            description={
+                                searchQuery || dateFilter ? '다른 키워드로 다시 찾아보세요.' : '지금 머릿속에 떠오르는 영감을 붙잡아두세요.'
+                            }
+                            // Memos have the editor right there, so maybe no button, or a button that focuses the input?
+                            // For simplicity, maybe just "Write a memo" pointing to input?
+                            // Actually the input is always visible at the top. So maybe no CTA is needed, or "Record one above".
+                            // Let's omit CTA for memos as the input is sticky/prominent.
+                            className="py-12"
+                        />
                     ) : (
                         <>
                             {groups.map((group) => (

@@ -12,6 +12,7 @@ interface ImageUploadButtonProps {
     variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
     size?: 'default' | 'sm' | 'lg' | 'icon'
     label?: string
+    disabled?: boolean
 }
 
 export function ImageUploadButton({
@@ -21,6 +22,7 @@ export function ImageUploadButton({
     variant = 'ghost',
     size = 'icon',
     label = '이미지 첨부',
+    disabled = false,
 }: ImageUploadButtonProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const { uploadImage, isUploading } = useImageUpload(bucketName)
@@ -41,12 +43,20 @@ export function ImageUploadButton({
     }
 
     const triggerUpload = () => {
+        if (disabled) return
         fileInputRef.current?.click()
     }
 
     return (
         <TooltipProvider>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} disabled={isUploading} />
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileChange}
+                disabled={isUploading || disabled}
+            />
             <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
@@ -59,7 +69,7 @@ export function ImageUploadButton({
                             className
                         )}
                         onClick={triggerUpload}
-                        disabled={isUploading}
+                        disabled={isUploading || disabled}
                     >
                         {isUploading ? (
                             <Loader2 className="h-5 w-5 animate-spin text-primary" />

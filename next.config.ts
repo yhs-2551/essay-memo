@@ -22,6 +22,9 @@ const config = {
             },
         ],
     },
+    // experimental: {
+    //     optimizePackageImports: ['lucide-react'], Lucide-react 같은 아이콘 라이브러리를 쓸 때, 사용하지 않는 아이콘까지 빌드에 포함되지 않도록 최적화
+    // },
 }
 
 export default config

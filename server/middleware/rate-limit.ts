@@ -22,7 +22,7 @@ export const rateLimit = createMiddleware(async (c, next) => {
             request_key: key,
             limit_count: LIMIT,
             window_seconds: WINDOW,
-        })
+        } as any)
 
         if (error) {
             console.error('Rate Limit RPC Error:', error)

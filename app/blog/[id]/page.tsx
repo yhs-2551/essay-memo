@@ -13,6 +13,7 @@ import { motion } from 'framer-motion'
 import { Activity, ArrowLeft, CheckCircle2, Quote, Sparkles, Stars } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 type PostData = {
     post: {
@@ -172,10 +173,12 @@ export default function PostPage() {
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             {data.post.images.map((url, i) => (
                                 <div key={i} className="relative aspect-video rounded-2xl overflow-hidden shadow-sm bg-black/5">
-                                    <img
+                                    <Image
                                         src={url}
                                         alt={`Gallery ${i}`}
-                                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+                                        fill
+                                        className="object-cover hover:scale-105 transition-transform duration-500"
+                                        sizes="(max-width: 768px) 100vw, 50vw"
                                     />
                                 </div>
                             ))}

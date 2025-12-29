@@ -8,8 +8,8 @@ import { z } from 'zod'
 
 // --- Post Schemas ---
 export const CreatePostSchema = z.object({
-    title: z.string().min(1, '제목을 입력해주세요'),
-    content: z.string().min(1, '내용을 입력해주세요'),
+    title: z.string().min(1, '제목을 입력해주세요').max(100, '제목은 100자를 초과할 수 없습니다'),
+    content: z.string().min(1, '내용을 입력해주세요').max(30000, '내용은 30,000자를 초과할 수 없습니다 (약 100KB)'),
     mode: z.enum(['standard', 'consultation']),
     is_published: z.boolean().optional(),
     images: z.array(z.string().url()).optional(),
@@ -20,7 +20,7 @@ export const UpdatePostSchema = CreatePostSchema.partial()
 
 // --- Memo Schemas ---
 export const CreateMemoSchema = z.object({
-    content: z.string().min(1, '내용을 입력해주세요'),
+    content: z.string().min(1, '내용을 입력해주세요').max(1000, '단상은 1,000자를 초과할 수 없습니다'),
 })
 
 export const UpdateMemoSchema = CreateMemoSchema.partial()
