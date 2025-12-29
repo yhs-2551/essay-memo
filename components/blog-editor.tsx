@@ -101,92 +101,114 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
         }
     }, [loadDraft, isEditing])
 
-    const handleSubmit = async () => {
+    // ===== Helper Functions (Clean Code: SRP) =====
+
+    const validateEditorInput = (): boolean => {
         if (!title.trim() || !content.trim()) {
             toast.error('제목과 내용을 모두 입력해주세요.')
-            return
+            return false
         }
+        return true
+    }
 
-        const wasStandard = isEditing && initialData?.mode === 'standard'
-        const willAnalyze = mode === 'consultation' && (!isEditing || updateAi || wasStandard)
+    const shouldAnalyzeContent = (): boolean => {
+        if (mode !== 'consultation') return false
+        if (!isEditing) return true
+        if (updateAi) return true
+        if (initialData?.mode === 'standard') return true
+        return false
+    }
 
-        // [STRICT CHECK] 저장 전에 최신 사용량을 서버에서 강제로 다시 확인합니다.
-        // 프론트엔드 상태가 꼬여서 저장이 되어버리는 것을 방지하기 위함입니다.
-        if (willAnalyze && !isSubscribed) {
-            await useUsageStore.getState().refreshUsage() // 강제 리프레시
-            const currentCount = useUsageStore.getState().count
+    const checkAIQuota = async (): Promise<boolean> => {
+        if (isSubscribed) return true
 
-            if (currentCount >= MAX_FREE_CONSULTATIONS) {
-                setShowSubscription(true)
-                return // 저장 로직 자체를 중단합니다.
-            }
-        }
+        await useUsageStore.getState().refreshUsage()
+        const currentCount = useUsageStore.getState().count
 
-        if (willAnalyze && !isSubscribed && count >= MAX_FREE_CONSULTATIONS) {
+        if (currentCount >= MAX_FREE_CONSULTATIONS) {
             setShowSubscription(true)
-            return
+            return false
+        }
+        return true
+    }
+
+    const savePostToDatabase = async () => {
+        const url = isEditing ? `/api/posts/${initialData?.id}` : '/api/posts'
+        const method = isEditing ? 'PATCH' : 'POST'
+
+        const payload = {
+            title,
+            content,
+            mode,
+            is_published: true,
+            images: uploadedImages,
         }
 
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+
+        const post = await res.json()
+        if (!post?.id) throw new Error('저장 실패')
+
+        return post
+    }
+
+    const runAIAnalysis = async (postId: string): Promise<void> => {
+        try {
+            const aiRes = await fetch('/api/ai/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ postId, persona }),
+            })
+
+            if (aiRes.ok) {
+                if (!isSubscribed) increment()
+            } else if (aiRes.status === 403) {
+                toast.error('일일 무료 상담 횟수를 모두 사용했습니다.')
+                setShowSubscription(true)
+            } else {
+                toast.error('AI 분석 중 문제가 발생했습니다.')
+            }
+        } catch (aiError) {
+            console.error('AI analysis failed:', aiError)
+            toast.error('AI 연결에 실패했습니다.')
+        }
+    }
+
+    // ===== Main Submit Handler (Orchestrator) =====
+
+    const handleSubmit = async () => {
+        // Guard: Input validation
+        if (!validateEditorInput()) return
+
+        const willAnalyze = shouldAnalyzeContent()
+
+        // Guard: AI quota check
+        if (willAnalyze) {
+            const hasQuota = await checkAIQuota()
+            if (!hasQuota) return
+        }
+
+        // Info: Image limit notification
         if (willAnalyze && uploadedImages.length > 5) {
-            // [Quantum UX] Frame limitation as 'Focus' for consciousness improvement
             toast.info('깊이 있는 통찰을 위해, AI는 가장 중요한 첫 5장의 시각적 기억에 집중합니다.', { duration: 5000 })
         }
 
         setLoading(true)
         try {
-            // [CHANGED] Images are now sent separately, not embedded in markdown
-            const finalContent = content
+            const post = await savePostToDatabase()
+            clearDraft()
 
-            const url = isEditing ? `/api/posts/${initialData?.id}` : '/api/posts'
-            const method = isEditing ? 'PATCH' : 'POST'
-
-            const payload = {
-                title,
-                content: finalContent,
-                mode,
-                is_published: true,
-                images: uploadedImages, // Send detached images
+            if (willAnalyze) {
+                await runAIAnalysis(post.id)
             }
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })
-            const post = await res.json()
-
-            if (post && post.id) {
-                clearDraft()
-
-                if (mode === 'consultation' && willAnalyze) {
-                    try {
-                        const aiRes = await fetch('/api/ai/analyze', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ postId: post.id, persona }),
-                        })
-
-                        if (aiRes.ok) {
-                            if (!isSubscribed) increment()
-                        } else if (aiRes.status === 403) {
-                            // Quota exceeded
-                            toast.error('일일 무료 상담 횟수를 모두 사용했습니다.')
-                            setShowSubscription(true)
-                        } else {
-                            toast.error('AI 분석 중 문제가 발생했습니다.')
-                        }
-                    } catch (aiError) {
-                        console.error('AI analysis failed:', aiError)
-                        toast.error('AI 연결에 실패했습니다.')
-                    }
-                }
-
-                toast.success(isEditing ? '수정되었습니다.' : '저장되었습니다.')
-                router.refresh()
-                router.replace(`/blog/${post.id}`)
-            } else {
-                throw new Error('저장 실패')
-            }
+            toast.success(isEditing ? '수정되었습니다.' : '저장되었습니다.')
+            router.refresh()
+            router.replace(`/blog/${post.id}`)
         } catch (e) {
             console.error(e)
             toast.error('저장 중 오류가 발생했습니다.')
