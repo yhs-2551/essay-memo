@@ -1,10 +1,45 @@
 console.log(' [System] Switching to Groq Logic...')
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://esm.sh/zod@3.22.4'
 
 // --- Configuration ---
 const TEXT_MODEL = 'qwen/qwen3-32b'
 const VISUAL_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct'
+
+// --- Zod Schemas for Type-Safe Validation ---
+const AnalyzedDataSchema = z.object({
+    meta: z.object({
+        model: z.string(),
+        timestamp: z.string(),
+    }),
+    sentiment: z.object({
+        primaryEmotion_ko: z.string(),
+        primaryEmotion_en: z.string(),
+        intensity: z.number().min(0).max(1),
+    }),
+    philosophy: z.object({
+        lens_ko: z.string(),
+        lens_en: z.string(),
+        summary_ko: z.string(),
+        keywords_en: z.array(z.string()),
+    }),
+    life_data: z.object({
+        summary: z.string(),
+        growth_point: z.string(),
+        suggested_actions: z.array(z.string()),
+    }),
+    vision: z
+        .object({
+            objects_ko: z.array(z.string()),
+            objects_en: z.array(z.string()),
+            mood_ko: z.string(),
+            mood_en: z.string(),
+        })
+        .nullable(),
+})
+
+type AnalyzedData = z.infer<typeof AnalyzedDataSchema>
 
 // --- Prompts ---
 const ANALYST_SYSTEM_PROMPT = `
@@ -140,14 +175,7 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// --- Interfaces ---
-interface AnalyzedData {
-    meta: { model: string; timestamp: string }
-    sentiment: { primaryEmotion_ko: string; primaryEmotion_en: string; intensity: number }
-    philosophy: { lens_ko: string; lens_en: string; summary_ko: string; keywords_en: string[] }
-    life_data: { summary: string; growth_point: string; suggested_actions: string[] }
-    vision: { objects_ko: string[]; objects_en: string[]; mood_ko: string; mood_en: string } | null
-}
+// --- Type is now inferred from Zod Schema above ---
 
 // --- Service Layer ---
 class AIModelService {
@@ -229,7 +257,20 @@ class AIModelService {
 
         console.log(` [Service] generating Analysis Data...`)
         const data = await this.callGroq(messages, model, true)
-        return JSON.parse(data.choices[0].message.content) as AnalyzedData
+        const rawContent = data.choices[0].message.content
+
+        // Zod Validation with safeParse (graceful error handling)
+        const parsed = AnalyzedDataSchema.safeParse(JSON.parse(rawContent))
+
+        if (!parsed.success) {
+            console.error(' [Zod] Validation Failed:', parsed.error.flatten())
+            // Fallback: Return raw parsed data with warning (maintains backward compatibility)
+            console.warn(' [Zod] Using raw data as fallback')
+            return JSON.parse(rawContent) as AnalyzedData
+        }
+
+        console.log(' [Zod] Validation Success')
+        return parsed.data
     }
 }
 
@@ -249,15 +290,28 @@ Deno.serve(async (req) => {
         const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
 
         const payload = await req.json()
-        const { record } = payload
 
-        if (!record || !record.id || !record.user_id) {
-            console.error(' [Error] Invalid Payload')
-            return new Response(JSON.stringify({ error: 'Invalid Payload' }), {
+        // Zod Validation for Request Payload
+        const PayloadSchema = z.object({
+            record: z.object({
+                id: z.string().uuid(),
+                user_id: z.string().uuid(),
+                content: z.string(),
+                images: z.array(z.string()).optional(),
+                persona: z.string().optional(),
+            }),
+        })
+
+        const parsedPayload = PayloadSchema.safeParse(payload)
+        if (!parsedPayload.success) {
+            console.error(' [Zod] Payload Validation Failed:', parsedPayload.error.flatten())
+            return new Response(JSON.stringify({ error: 'Invalid Payload', details: parsedPayload.error.flatten() }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             })
         }
+
+        const { record } = parsedPayload.data
 
         const { data: profile, error: profileError } = await supabase
             .from('profiles')

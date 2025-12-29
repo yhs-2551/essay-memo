@@ -1,15 +1,16 @@
 'use client'
 
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Background } from '@/components/background'
 import { Card } from '@/components/ui/card'
-import { Sparkles, ArrowLeft } from 'lucide-react'
+import { Sparkles, ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
-export default function LoginPage() {
+function LoginContent() {
     const searchParams = useSearchParams()
     const next = searchParams.get('next') || '/'
 
@@ -92,5 +93,19 @@ export default function LoginPage() {
                 </Card>
             </div>
         </main>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="flex min-h-screen flex-col items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </main>
+            }
+        >
+            <LoginContent />
+        </Suspense>
     )
 }

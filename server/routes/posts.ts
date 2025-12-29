@@ -37,11 +37,17 @@ app.get('/:id', async (c) => {
     const id = c.req.param('id')
     const supabase = await createClient()
 
-    const { data: post, error: postError } = await supabase.from('posts').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
 
-    if (postError) return c.json({ error: postError.message }, 404)
+    if (error) return c.json({ error: error.message }, 404)
 
-    const { data: consultation } = await supabase.from('consultations').select('*').eq('post_id', id).single()
+    // Handle joined data (consultations can be array or object depending on relationship)
+    // @ts-ignore
+    const consultationData = data.consultations
+    const consultation = Array.isArray(consultationData) ? consultationData[0] : consultationData
+
+    // Remove the joined property from post object to match original response structure
+    const { consultations: _removed, ...post } = data as any
 
     return c.json({ post, consultation })
 })

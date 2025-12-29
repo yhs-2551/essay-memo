@@ -1,15 +1,8 @@
 'use client'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useTheme } from 'next-themes'
 import { Lock } from 'lucide-react'
-
-interface Persona {
-    id: string
-    name: string
-    desc: string
-    icon: string
-}
+import { PERSONAS } from '@/lib/constants'
 
 interface PersonaSelectionModalProps {
     open: boolean
@@ -20,15 +13,6 @@ interface PersonaSelectionModalProps {
     onSubscribeClick: () => void
 }
 
-export const PERSONAS: Persona[] = [
-    { id: 'prism', name: '프리즘', desc: '내면의 균형을 찾아주는 따뜻한 빛', icon: '✨' },
-    { id: 'nietzsche', name: '니체', desc: '고난을 축복으로 바꾸는 운명애', icon: '🔥' },
-    { id: 'aurelius', name: '아우렐리우스', desc: '흔들리지 않는 평온한 바위', icon: '🏛️' },
-    { id: 'jung', name: '칼 융', desc: '무의식의 그림자와 마주하는 용기', icon: '🌑' },
-    { id: 'zhuangzi', name: '장자', desc: '자유롭게 비상하는 나비의 꿈', icon: '🦋' },
-    { id: 'beauvoir', name: '보부아르', desc: '스스로를 정의하는 실존의 자유', icon: '👠' },
-]
-
 export function PersonaSelectionModal({
     open,
     onOpenChange,
@@ -37,8 +21,6 @@ export function PersonaSelectionModal({
     isSubscribed,
     onSubscribeClick,
 }: PersonaSelectionModalProps) {
-    const { theme } = useTheme()
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl w-[95vw] sm:w-full max-h-[85vh] overflow-y-auto bg-background/95 backdrop-blur-xl border-none shadow-2xl p-6 md:p-8">

@@ -149,5 +149,15 @@ export interface Database {
                 }
             }
         }
+        Functions: {
+            check_rate_limit: {
+                Args: {
+                    request_key: string
+                    limit_count: number
+                    window_seconds: number
+                }
+                Returns: boolean
+            }
+        }
     }
 }
