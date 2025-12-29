@@ -145,50 +145,68 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         [key, supabase, userId]
     )
 
-    // --- Smart Load Strategy (Conflict Resolution) ---
-    const loadDraft = useCallback(async (): Promise<T | null> => {
-        if (typeof window === 'undefined') return null
-        if (!storageKey) return null // Not ready to load
+    // ===== Helper Functions (Clean Code: SRP) =====
 
-        let localData: T | null = null
-        let localTime = 0
-
-        // 1. Read L1 (IndexedDB) with Isolated Key
+    /**
+     * Read draft from L1 Storage (IndexedDB)
+     */
+    const readLocalStorage = useCallback(async (storageKey: string) => {
         try {
             const parsed = (await l1Storage.get(storageKey)) as StorageWrapper | null
             if (parsed && typeof parsed === 'object' && 'data' in parsed) {
-                localData = parsed.data
-                localTime = parsed.timestamp
-            } else {
-                // [Edge Case] Legacy Migration or Fallback
-                // If isolated key is empty, check for legacy non-prefixed key (backward compatibility)
-                // This ensures existing users don't lose drafts after this update.
-                const legacyParsed = (await l1Storage.get(key)) as StorageWrapper | null
-                if (legacyParsed && typeof legacyParsed === 'object' && 'data' in legacyParsed) {
-                    console.log('Orbit Sync: Migrating legacy draft to isolated storage')
-                    localData = legacyParsed.data
-                    localTime = legacyParsed.timestamp
-                    await l1Storage.set(storageKey, legacyParsed) // Migrate
-                    await l1Storage.remove(key) // Clean old
-                } else {
-                    // Check localStorage legacy (very old)
-                    const legacyRaw = localStorage.getItem(key)
-                    if (legacyRaw) {
-                        try {
-                            const parsedOld = JSON.parse(legacyRaw)
-                            localData = parsedOld.data || parsedOld
-                            await l1Storage.set(storageKey, { data: localData, timestamp: Date.now(), version: 2 })
-                            localStorage.removeItem(key)
-                        } catch {}
-                    }
-                }
+                return { data: parsed.data, timestamp: parsed.timestamp }
             }
         } catch (e) {
             console.warn('Orbit Sync: L1 Read Failed', e)
         }
+        return null
+    }, [])
 
-        // 2. Read L2 (Server)
-        if (userId) {
+    /**
+     * Migrate legacy drafts to new isolated format
+     * Legacy formats:
+     * 1. IndexedDB with non-prefixed key (e.g., "draft-new-post")
+     * 2. localStorage (very old, pre-IndexedDB era)
+     */
+    const migrateLegacyDraft = useCallback(async (storageKey: string, key: string) => {
+        // Try IndexedDB legacy format
+        try {
+            const legacyParsed = (await l1Storage.get(key)) as StorageWrapper | null
+            if (legacyParsed && typeof legacyParsed === 'object' && 'data' in legacyParsed) {
+                console.log('Orbit Sync: Migrating legacy draft to isolated storage')
+                await l1Storage.set(storageKey, legacyParsed)
+                await l1Storage.remove(key)
+                return { data: legacyParsed.data, timestamp: legacyParsed.timestamp }
+            }
+        } catch (e) {
+            console.warn('Orbit Sync: IndexedDB legacy migration failed', e)
+        }
+
+        // Try localStorage legacy format
+        try {
+            const legacyRaw = localStorage.getItem(key)
+            if (legacyRaw) {
+                const parsedOld = JSON.parse(legacyRaw)
+                const data = parsedOld.data || parsedOld
+                const timestamp = Date.now()
+                await l1Storage.set(storageKey, { data, timestamp, version: 2 })
+                localStorage.removeItem(key)
+                return { data, timestamp }
+            }
+        } catch (e) {
+            console.warn('Orbit Sync: localStorage legacy migration failed', e)
+        }
+
+        return null
+    }, [])
+
+    /**
+     * Read draft from L2 Storage (Supabase)
+     */
+    const readServerStorage = useCallback(
+        async (key: string) => {
+            if (!userId) return null
+
             try {
                 const { data: serverDraft } = await supabase
                     .from('drafts')
@@ -198,23 +216,62 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
                     .single()
 
                 if (serverDraft) {
-                    const serverTime = new Date(serverDraft.updated_at).getTime()
-                    // Strategy: Server Wins if significantly newer (> 1s)
-                    if (serverTime > localTime + 1000) {
-                        console.log('Orbit Sync: Remote logic prevails. Syncing down.')
-                        toast.info('다른 기기에서 작성된 최신 글을 불러왔습니다.')
-                        // Save server draft to local isolated storage
-                        await saveToLocal(serverDraft.data as T)
-                        return serverDraft.data as T
+                    return {
+                        data: serverDraft.data as T,
+                        timestamp: new Date(serverDraft.updated_at).getTime(),
                     }
                 }
             } catch (e) {
                 console.warn('Orbit Sync: L2 Read Failed', e)
             }
+
+            return null
+        },
+        [userId, supabase]
+    )
+
+    /**
+     * Resolve conflict between local and server drafts
+     * Strategy: Server wins if significantly newer (> 1s)
+     */
+    const resolveConflict = useCallback(
+        async (local: { data: T; timestamp: number } | null, server: { data: T; timestamp: number } | null): Promise<T | null> => {
+            if (!server) return local?.data || null
+            if (!local) return server.data
+
+            // Server wins if significantly newer
+            if (server.timestamp > local.timestamp + 1000) {
+                console.log('Orbit Sync: Remote logic prevails. Syncing down.')
+                toast.info('다른 기기에서 작성된 최신 글을 불러왔습니다.')
+                await saveToLocal(server.data)
+                return server.data
+            }
+
+            return local.data
+        },
+        [saveToLocal]
+    )
+
+    // ===== Smart Load Strategy (Orchestrator) =====
+
+    const loadDraft = useCallback(async (): Promise<T | null> => {
+        if (typeof window === 'undefined') return null
+        if (!storageKey) return null
+
+        // 1. Try to read from local storage
+        let localData = await readLocalStorage(storageKey)
+
+        // 2. If not found, try legacy migration
+        if (!localData) {
+            localData = await migrateLegacyDraft(storageKey, key)
         }
 
-        return localData
-    }, [key, saveToLocal, supabase, userId, storageKey])
+        // 3. Read from server
+        const serverData = await readServerStorage(key)
+
+        // 4. Resolve conflict and return
+        return resolveConflict(localData, serverData)
+    }, [storageKey, key, readLocalStorage, migrateLegacyDraft, readServerStorage, resolveConflict])
 
     // --- Online Recovery (Edge Case: Offline -> Online) ---
     useEffect(() => {

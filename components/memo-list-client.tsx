@@ -17,6 +17,7 @@ import { MemoEditor } from '@/components/memo-editor'
 import { Checkbox } from '@/components/ui/checkbox'
 import { MarkdownContent } from '@/components/markdown-content'
 import { useSelection } from '@/hooks/use-selection'
+import { useInfiniteList } from '@/hooks/use-infinite-list'
 import { SelectionBar } from '@/components/selection-bar'
 import { useLongPress } from '@/hooks/use-long-press'
 import { FeatureDiscovery } from '@/components/feature-discovery'
@@ -128,99 +129,30 @@ interface MemoClientPageProps {
 }
 
 export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
-    const [memos, setMemos] = useState<Memo[]>(initialMemos)
-    const [fetching, setFetching] = useState(false)
-    const [loadingMore, setLoadingMore] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
-    const [page, setPage] = useState(1)
-    const [hasMore, setHasMore] = useState(initialMemos.length >= 20) // Correct initial state
-    const [error, setError] = useState(false) // Added error state
-    const [dateFilter, setDateFilter] = useState<string>('') // "YYYY-MM"
+    // ===== Infinite Scroll Hook =====
+    const {
+        items: memos,
+        setItems: setMemos,
+        fetching,
+        loadingMore,
+        searchQuery,
+        setSearchQuery,
+        hasMore,
+        error,
+        dateFilter,
+        setDateFilter,
+        observerTarget,
+        refreshItems,
+    } = useInfiniteList({ initialItems: initialMemos, fetchUrl: '/api/memos' })
+
+    // ===== Component State =====
     const { theme } = useTheme()
-    const observerTarget = useRef<HTMLDivElement>(null)
 
     const { selectedIds, toggleSelect, selectAll, clearSelection, isSelected } = useSelection(memos)
 
     // Delete Modal State
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
     const [isBulkDelete, setIsBulkDelete] = useState(false)
-
-    // Only fetch if query changes or page > 1 (pagination)
-    // Avoid re-fetching page 1 if initial data is there and no query change
-    const isFirstRender = useRef(true)
-
-    const fetchMemos = async (pageNum: number, query: string) => {
-        try {
-            setError(false) // Reset error on new attempt
-            if (pageNum === 1) setFetching(true)
-            else setLoadingMore(true)
-
-            const limit = 20
-            const res = await fetch(`/api/memos?q=${encodeURIComponent(query)}&page=${pageNum}&limit=${limit}`)
-            if (!res.ok) throw new Error('Failed to fetch memos')
-
-            const data = await res.json()
-
-            if (data.memos) {
-                if (pageNum === 1) {
-                    setMemos(data.memos)
-                } else {
-                    setMemos((prev) => [...prev, ...data.memos])
-                }
-                setHasMore(data.hasMore)
-            }
-        } catch (e) {
-            console.error(e)
-            setError(true) // Enable "Retry" UI
-            toast.error('단상을 불러오지 못했습니다.')
-        } finally {
-            setFetching(false)
-            setLoadingMore(false)
-        }
-    }
-
-    // Search Effect (Debounced)
-    useEffect(() => {
-        // Skip initial fetch on mount if we have data & no query
-        if (isFirstRender.current && !searchQuery) {
-            isFirstRender.current = false
-            return
-        }
-
-        const debounceTimer = setTimeout(() => {
-            setPage(1) // Always reset to page 1 on search
-            fetchMemos(1, searchQuery)
-        }, 300)
-
-        return () => clearTimeout(debounceTimer)
-    }, [searchQuery])
-
-    // Pagination Effect (Immediate)
-    useEffect(() => {
-        if (page === 1) return // Handled by search/mount
-        if (error) return // Don't auto-fetch on error
-        fetchMemos(page, searchQuery)
-    }, [page])
-
-    // Infinite Scroll Observer
-    useEffect(() => {
-        if (!hasMore || fetching || loadingMore || error) return // Stop if Error or no more
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    setPage((prev) => prev + 1) // Just update page, effect above will fetch
-                }
-            },
-            { threshold: 0.1, rootMargin: '100px' }
-        )
-
-        if (observerTarget.current) {
-            observer.observe(observerTarget.current)
-        }
-
-        return () => observer.disconnect()
-    }, [hasMore, fetching, loadingMore, page, searchQuery, error])
 
     // Optimize: Computation
     const filteredMemos = useMemo(() => {
@@ -414,7 +346,7 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => fetchMemos(page, searchQuery)}
+                                            onClick={refreshItems}
                                             className="bg-primary/5 hover:bg-primary/10 text-primary rounded-full px-6"
                                         >
                                             <Loader2 className="w-3 h-3 mr-2" /> 다시 시도
