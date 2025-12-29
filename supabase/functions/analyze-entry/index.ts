@@ -6,6 +6,20 @@ import { z } from 'https://esm.sh/zod@3.22.4'
 // --- Configuration ---
 const TEXT_MODEL = 'qwen/qwen3-32b'
 const VISUAL_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct'
+const IMAGE_ANALYSIS_LIMIT = 5 // AI 비전 컨텍스트 이미지 제한 (비용 최적화)
+
+// --- Utility Functions ---
+/**
+ * 이미지 배열에 제한을 적용하고 초과 시 로그 출력
+ * [클린 코드 11-3: 함수는 한 가지 일만]
+ */
+const applyImageLimit = (images: string[], limit: number): string[] => {
+    const hasExceededLimit = images.length > limit
+    if (hasExceededLimit) {
+        console.log(`[System] Image limit applied: ${images.length} -> ${limit}`)
+    }
+    return images.slice(0, limit)
+}
 
 // --- Zod Schemas for Type-Safe Validation ---
 const AnalyzedDataSchema = z.object({
@@ -324,14 +338,9 @@ Deno.serve(async (req) => {
         }
 
         const tier = (profile.subscription_tier as 'free' | 'pro') || 'free'
-        // [Cost Control] Limit AI vision context to first 5 images only (Balanced for Pro)
         const allImages = (record.images as string[]) || []
-        const images = allImages.slice(0, 5)
-
-        if (allImages.length > 5) {
-            console.log(` [System] Image limit applied: ${allImages.length} -> 5`)
-        }
-        const persona = record.persona || 'prism' // Fetch Persona
+        const images = applyImageLimit(allImages, IMAGE_ANALYSIS_LIMIT)
+        const persona = record.persona || 'prism'
 
         const aiService = new AIModelService()
 
