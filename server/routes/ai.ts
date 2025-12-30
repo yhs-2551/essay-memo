@@ -28,10 +28,10 @@ app.post(
             return c.json({ error: 'Unauthorized' }, 401)
         }
 
-        // 1. Quota Check (Server-side)
+        // 1. Quota Check (Server-side) - 티어별 제한 적용
         const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('consultation_count, last_consultation_date')
+            .select('consultation_count, last_consultation_date, subscription_tier')
             .eq('id', user.id)
             .single()
 
@@ -44,7 +44,7 @@ app.post(
         const today = new Date()
         const lastDate = profile.last_consultation_date ? new Date(profile.last_consultation_date) : new Date(0)
 
-        // 날짜가 다르면 카운트 리셋 로직
+        // 날짜가 다르면 카운트 리셋
         let currentCount = profile.consultation_count || 0
         const isSameDay = today.toDateString() === lastDate.toDateString()
 
@@ -52,8 +52,19 @@ app.post(
             currentCount = 0
         }
 
-        if (currentCount >= 3) {
-            return c.json({ error: 'Daily consultation limit reached (3/3)' }, 403)
+        // 티어별 일일 제한 체크 (확장성 고려)
+        const isPro = profile.subscription_tier === 'pro'
+        const dailyLimit = isPro ? 10 : 2 // Pro: 10회, Free: 2회
+
+        const hasExceededLimit = currentCount >= dailyLimit
+        if (hasExceededLimit) {
+            return c.json(
+                {
+                    error: `Daily consultation limit reached (${currentCount}/${dailyLimit})`,
+                    tierInfo: isPro ? 'pro' : 'free',
+                },
+                403
+            )
         }
 
         // 2. 게시글 데이터 가져오기
