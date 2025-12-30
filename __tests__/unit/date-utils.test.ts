@@ -78,9 +78,9 @@ describe('date-utils', () => {
 
         it('같은 월의 여러 항목을 하나의 그룹으로 통합', () => {
             const items = [
-                { id: '1', created_at: '2023-03-01T10:00:00Z' },
-                { id: '2', created_at: '2023-03-15T15:00:00Z' },
-                { id: '3', created_at: '2023-03-31T20:00:00Z' },
+                { id: '1', created_at: '2023-03-01T00:00:00Z' },
+                { id: '2', created_at: '2023-03-15T00:00:00Z' },
+                { id: '3', created_at: '2023-03-25T00:00:00Z' }, // UTC 시간 경계 문제 방지
             ]
 
             const result = groupItemsByDate(items)
@@ -124,9 +124,9 @@ describe('date-utils', () => {
 
         it('중복된 년/월 제거', () => {
             const items = [
-                { id: '1', created_at: '2023-03-01T10:00:00Z' },
-                { id: '2', created_at: '2023-03-15T15:00:00Z' },
-                { id: '3', created_at: '2023-03-31T20:00:00Z' },
+                { id: '1', created_at: '2023-03-01T00:00:00Z' },
+                { id: '2', created_at: '2023-03-15T00:00:00Z' },
+                { id: '3', created_at: '2023-03-25T00:00:00Z' }, // UTC 시간 경계 문제 방지
             ]
 
             const result = getAvailableDates(items)

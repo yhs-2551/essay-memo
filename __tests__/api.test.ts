@@ -4,13 +4,22 @@ import { app } from '../server/app'
 // Mock Supabase to avoid real DB calls during test
 vi.mock('@/lib/supabase/server', () => ({
     createClient: async () => ({
+        auth: {
+            getUser: () =>
+                Promise.resolve({
+                    data: { user: { id: 'test-user-123' } },
+                    error: null,
+                }),
+        },
         from: () => ({
             select: () => ({
-                order: () => Promise.resolve({ data: [], error: null }), // mock get response
+                order: () => ({
+                    range: () => Promise.resolve({ data: [], error: null, count: 0 }),
+                }),
             }),
             insert: () => ({
                 select: () => ({
-                    single: () => Promise.resolve({ data: { id: '1', content: 'test' }, error: null }),
+                    single: () => Promise.resolve({ data: { id: '1', content: 'Test Content', user_id: 'test-user-123' }, error: null }),
                 }),
             }),
         }),
