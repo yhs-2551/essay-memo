@@ -55,4 +55,6 @@ export const useUsageStore = create<UsageState>((set) => ({
     setSubscribed: (value: boolean) => set({ isSubscribed: value }),
 }))
 
-export const MAX_FREE_CONSULTATIONS = 3
+// 일일 AI 상담 제한 (마진율 75% 유지)
+export const MAX_FREE_CONSULTATIONS = 2 // Free 티어
+export const MAX_PRO_CONSULTATIONS = 10 // Pro 티어

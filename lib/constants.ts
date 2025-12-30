@@ -46,8 +46,15 @@ export type SyncStatus = (typeof SYNC_STATUS)[keyof typeof SYNC_STATUS]
 export const AI_CONFIG = {
     TEXT_MODEL: 'qwen/qwen3-32b',
     VISUAL_MODEL: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-    DAILY_FREE_LIMIT: 3,
+    DAILY_FREE_LIMIT: 2, // Free 티어: 일 2회
+    DAILY_PRO_LIMIT: 10, // Pro 티어: 일 10회 (마진율 75% 유지)
     TIMEOUT_MS: 10000,
+} as const
+
+// --- Persona Access Configuration ---
+export const PERSONA_ACCESS = {
+    FREE: ['prism'] as const, // Free는 프리즘만
+    PRO: PERSONAS.map((p) => p.id) as readonly PersonaId[], // Pro는 전체 6개
 } as const
 
 // --- UI Configuration ---
