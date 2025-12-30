@@ -25,12 +25,16 @@ describe('AI Route Logic', () => {
         vi.clearAllMocks()
     })
 
+    const VALID_UUID_1 = '123e4567-e89b-12d3-a456-426614174001'
+    const VALID_UUID_2 = '123e4567-e89b-12d3-a456-426614174002'
+    const VALID_UUID_3 = '123e4567-e89b-12d3-a456-426614174003'
+
     it('should return 401 if not authenticated', async () => {
         mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: 'No user' })
 
         const req = new Request('http://localhost/analyze', {
             method: 'POST',
-            body: JSON.stringify({ postId: 'curr-uuid', persona: 'prism' }),
+            body: JSON.stringify({ postId: VALID_UUID_1, persona: 'prism' }),
             headers: { 'Content-Type': 'application/json' },
         })
 
@@ -59,7 +63,7 @@ describe('AI Route Logic', () => {
 
         const req = new Request('http://localhost/analyze', {
             method: 'POST',
-            body: JSON.stringify({ postId: 'some-uuid-1234', persona: 'prism' }),
+            body: JSON.stringify({ postId: VALID_UUID_2, persona: 'prism' }),
             headers: { 'Content-Type': 'application/json' },
         })
 
@@ -90,7 +94,7 @@ describe('AI Route Logic', () => {
 
         const req = new Request('http://localhost/analyze', {
             method: 'POST',
-            body: JSON.stringify({ postId: 'some-uuid-5678', persona: 'prism' }),
+            body: JSON.stringify({ postId: VALID_UUID_3, persona: 'prism' }),
             headers: { 'Content-Type': 'application/json' },
         })
 
@@ -121,7 +125,7 @@ describe('AI Route Logic', () => {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             single: vi.fn().mockResolvedValue({
-                data: { id: 'post-1', content: 'Test content', user_id: 'user-ok' },
+                data: { id: VALID_UUID_1, content: 'Test content', user_id: 'user-ok' },
                 error: null,
             }),
         }
@@ -152,7 +156,7 @@ describe('AI Route Logic', () => {
 
         const req = new Request('http://localhost/analyze', {
             method: 'POST',
-            body: JSON.stringify({ postId: 'post-1', persona: 'prism' }),
+            body: JSON.stringify({ postId: VALID_UUID_1, persona: 'prism' }),
             headers: { 'Content-Type': 'application/json' },
         })
 
