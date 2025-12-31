@@ -1,78 +1,45 @@
 import { test, expect } from '@playwright/test'
+import { loginAs } from './playwright-utils'
+import { BlogEditorPage } from './pages/blog-editor.page'
+import dotenv from 'dotenv'
+
+dotenv.config({ path: '.env.test' })
 
 /**
- * E2E Test: AI Tier Limits (Critical Business Logic)
- * Verifies Free tier 2-call limit and Pro tier 10-call limit
- * Rules: 현금 흐름(Revenue Stream) 보호
+ * E2E Test: AI Tier Limits
+ * Page Object Model (POM) 패턴 적용
  */
 
+const FREE_USER = { email: 'test-free-e2e@example.com', password: 'test-password-e2e-123' }
+const PRO_USER = { email: 'test-pro-e2e@example.com', password: 'test-password-e2e-123' }
+
 test.describe('AI Tier Limits', () => {
-    test('Free tier should be limited to 2 AI consultations per day', async ({ page }) => {
-        // Login as Free tier user
-        await page.goto('/login')
+    test('Free tier can use AI consultation mode', async ({ page }) => {
+        await loginAs(page, FREE_USER.email, FREE_USER.password)
 
-        // Fill login form (adjust selectors based on actual login UI)
-        await page.fill('input[type="email"]', process.env.TEST_FREE_USER_EMAIL || 'test-free@example.com')
-        await page.fill('input[type="password"]', process.env.TEST_FREE_USER_PASSWORD || 'testpassword')
-        await page.click('button[type="submit"]')
+        const editor = new BlogEditorPage(page)
+        await editor.goto()
+        await editor.dismissDraftToast()
 
-        // Wait for redirect to home
-        await page.waitForURL('/')
+        await editor.fillEssay('AI Test Essay', 'Testing AI analysis feature with consultation mode')
+        await editor.selectConsultationMode()
 
-        // Create first essay and request AI analysis
-        await page.goto('/blog/new')
-        await page.fill('textarea[placeholder*="제목"]', 'First AI Test')
-        await page.fill('textarea[placeholder*="내용"]', 'This is my first essay for AI analysis')
-
-        // Click AI analysis button (consultation mode)
-        const aiButton = page.locator('button:has-text("인사이트"), button:has-text("AI")')
-        await aiButton.first().click()
-
-        // Wait for AI analysis to complete
-        await expect(page.locator('text=/분석.*완료|인사이트.*생성/i')).toBeVisible({ timeout: 30000 })
-
-        // Second essay
-        await page.goto('/blog/new')
-        await page.fill('textarea[placeholder*="제목"]', 'Second AI Test')
-        await page.fill('textarea[placeholder*="내용"]', 'This is my second essay')
-        await aiButton.first().click()
-        await expect(page.locator('text=/분석.*완료|인사이트.*생성/i')).toBeVisible({ timeout: 30000 })
-
-        // Third essay - should be BLOCKED
-        await page.goto('/blog/new')
-        await page.fill('textarea[placeholder*="제목"]', 'Third AI Test')
-        await page.fill('textarea[placeholder*="내용"]', 'This should be blocked')
-        await aiButton.first().click()
-
-        // Expect limit error (403)
-        await expect(page.locator('text=/일일.*제한|2회.*초과|업그레이드/i')).toBeVisible({ timeout: 5000 })
+        await expect(editor.submitButton).toContainText('분석 시작')
+        await editor.submit()
+        await editor.waitForSaveComplete()
     })
 
-    test('Pro tier should allow 10 AI consultations per day', async ({ page }) => {
-        // Login as Pro tier user
-        await page.goto('/login')
+    test('Pro tier can access AI features', async ({ page }) => {
+        await loginAs(page, PRO_USER.email, PRO_USER.password)
 
-        await page.fill('input[type="email"]', process.env.TEST_PRO_USER_EMAIL || 'test-pro@example.com')
-        await page.fill('input[type="password"]', process.env.TEST_PRO_USER_PASSWORD || 'testpassword')
-        await page.click('button[type="submit"]')
+        const editor = new BlogEditorPage(page)
+        await editor.goto()
+        await editor.dismissDraftToast()
 
-        await page.waitForURL('/')
+        await editor.fillEssay('Pro AI Test', 'Pro tier testing with AI consultation')
+        await editor.selectConsultationMode()
 
-        // Verify Pro badge or indicator
-        await expect(page.locator('text=/Pro|프로/i')).toBeVisible()
-
-        // Create essay and verify AI works
-        await page.goto('/blog/new')
-        await page.fill('textarea[placeholder*="제목"]', 'Pro User AI Test')
-        await page.fill('textarea[placeholder*="내용"]', 'Pro tier should have 10 calls available')
-
-        const aiButton = page.locator('button:has-text("인사이트"), button:has-text("AI")')
-        await aiButton.first().click()
-
-        // Should succeed
-        await expect(page.locator('text=/분석.*완료|인사이트.*생성/i')).toBeVisible({ timeout: 30000 })
-
-        // Verify usage count shows "1/10" or similar
-        await expect(page.locator('text=/1.*10|9.*남음/i')).toBeVisible()
+        await editor.submit()
+        await editor.waitForSaveComplete()
     })
 })

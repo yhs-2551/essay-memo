@@ -264,6 +264,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                         {viewMode === 'edit' ? (
                             <Card className="p-8 bg-background/60 backdrop-blur-xl border-none shadow-2xl min-h-[600px] flex flex-col">
                                 <Input
+                                    data-testid="editor-title"
                                     placeholder="제목을 입력하세요..."
                                     className="text-3xl font-bold border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/30 h-auto py-2"
                                     value={title}
@@ -271,6 +272,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                 />
                                 <div className="h-px bg-border/50 my-6" />
                                 <Textarea
+                                    data-testid="editor-content"
                                     placeholder="당신의 진솔한 기록을 들려주세요..."
                                     className="flex-1 border-none bg-transparent px-0 text-lg resize-none focus-visible:ring-0 leading-relaxed min-h-[400px]"
                                     value={content}
@@ -313,6 +315,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                             <h3 className="font-bold text-sm mb-4 uppercase tracking-tighter">인사이트 모드</h3>
                             <div className="space-y-3">
                                 <div
+                                    data-testid="mode-standard"
                                     className={`p-4 rounded-2xl border-2 transition-all group cursor-pointer ${
                                         mode === 'standard' ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted/50'
                                     }`}
@@ -323,6 +326,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                                 </div>
 
                                 <div
+                                    data-testid="mode-consultation"
                                     className={`p-4 rounded-2xl border-2 transition-all group cursor-pointer ${
                                         mode === 'consultation'
                                             ? 'border-purple-500 bg-purple-500/5'
@@ -441,6 +445,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
 
                         <div className="sticky top-6">
                             <Button
+                                data-testid="editor-submit"
                                 className="w-full h-14 rounded-2xl shadow-2xl shadow-primary/20 text-lg font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
                                 onClick={handleSubmit}
                                 disabled={loading}

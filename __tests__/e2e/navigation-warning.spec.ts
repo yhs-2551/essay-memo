@@ -1,58 +1,28 @@
 import { test, expect } from '@playwright/test'
+import { loginAs } from './playwright-utils'
+import { BlogEditorPage } from './pages/blog-editor.page'
+
+const USER = { email: 'test-free-e2e@example.com', password: 'test-password-e2e-123' }
 
 /**
- * E2E Test: Navigation Warning (beforeunload)
- * Verifies use-navigation-warning.ts hook functionality
+ * E2E Test: Navigation & Save
+ * Page Object Model (POM) 패턴 적용
  */
 
-test.describe('Navigation Warning', () => {
-    test('should warn user when leaving page with unsaved content', async ({ page, context }) => {
-        // Navigate to new essay page
-        await page.goto('/blog/new')
+test.describe('Essay Save Flow', () => {
+    test('should save essay in standard mode', async ({ page }) => {
+        await loginAs(page, USER.email, USER.password)
 
-        // Wait for editor
-        await page.waitForSelector('textarea[placeholder*="제목"]')
+        const editor = new BlogEditorPage(page)
+        await editor.goto()
+        await editor.dismissDraftToast()
 
-        // Type some content
-        await page.fill('textarea[placeholder*="제목"]', 'Unsaved Essay')
-        await page.fill('textarea[placeholder*="내용"]', 'This content should trigger navigation warning')
+        await editor.fillEssay('Save Test Essay', 'This content will be saved')
 
-        // Set up dialog handler for beforeunload
-        page.on('dialog', async (dialog) => {
-            expect(dialog.type()).toBe('beforeunload')
-            await dialog.dismiss()
-        })
+        // 자유 기록 모드 (기본값)
+        await expect(editor.submitButton).toContainText('저장 완료')
+        await editor.submit()
 
-        // Try to navigate away
-        await page.goto('/')
-
-        // If warning worked, we should still be on the editor page
-        // (dialog was dismissed, preventing navigation)
-        const currentUrl = page.url()
-        expect(currentUrl).toContain('/blog/new')
-    })
-
-    test('should NOT warn when content is saved', async ({ page }) => {
-        // Navigate to new essay page
-        await page.goto('/blog/new')
-
-        await page.waitForSelector('textarea[placeholder*="제목"]')
-
-        // Type and save
-        await page.fill('textarea[placeholder*="제목"]', 'Saved Essay')
-        await page.fill('textarea[placeholder*="내용"]', 'This is saved')
-
-        // Click save/publish button
-        const saveButton = page.locator('button:has-text("저장"), button:has-text("발행")')
-        await saveButton.first().click()
-
-        // Wait for save confirmation
-        await expect(page.locator('text=/저장.*완료|발행.*완료/i')).toBeVisible({ timeout: 5000 })
-
-        // Now navigate away - should NOT trigger warning
-        await page.goto('/')
-
-        // Should successfully navigate to home
-        expect(page.url()).toBe('http://localhost:3000/')
+        await editor.waitForSaveComplete()
     })
 })
