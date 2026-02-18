@@ -373,8 +373,8 @@ export default function PostPage() {
                                                 nietzsche: '니체의 시선',
                                                 aurelius: '아우렐리우스의 시선',
                                                 jung: '칼 융의 시선',
-                                                zhuangzi: '장자의 시선',
-                                                beauvoir: '보부아르의 시선',
+                                                buddha: '붓다의 시선',
+                                                epictetus: '에픽테토스의 시선',
                                             }
                                             return `${names[personaId] || '프리즘의 시선'}: ${cData?.philosophy?.lens_ko}`
                                         })()}

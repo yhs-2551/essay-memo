@@ -47,8 +47,8 @@ describe('Subscription Tier Limits', () => {
             expect(lockedPersonas).toContain('nietzsche')
             expect(lockedPersonas).toContain('aurelius')
             expect(lockedPersonas).toContain('jung')
-            expect(lockedPersonas).toContain('zhuangzi')
-            expect(lockedPersonas).toContain('beauvoir')
+            expect(lockedPersonas).toContain('buddha')
+            expect(lockedPersonas).toContain('epictetus')
         })
     })
 

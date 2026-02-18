@@ -10,8 +10,8 @@ export const PERSONAS = [
     { id: 'nietzsche', name: '니체', desc: '고난을 축복으로 바꾸는 운명애', icon: '🔥' },
     { id: 'aurelius', name: '아우렐리우스', desc: '흔들리지 않는 평온한 바위', icon: '🏛️' },
     { id: 'jung', name: '칼 융', desc: '무의식의 그림자와 마주하는 용기', icon: '🌑' },
-    { id: 'zhuangzi', name: '장자', desc: '자유롭게 비상하는 나비의 꿈', icon: '🦋' },
-    { id: 'beauvoir', name: '보부아르', desc: '스스로를 정의하는 실존의 자유', icon: '👠' },
+    { id: 'buddha', name: '붓다', desc: '집착을 내려놓을 때 비로소 자유로워진다', icon: '☸️' },
+    { id: 'epictetus', name: '에픽테토스', desc: '내가 통제할 수 있는 것에만 집중하라', icon: '⚖️' },
 ] as const
 
 export type PersonaId = (typeof PERSONAS)[number]['id']
