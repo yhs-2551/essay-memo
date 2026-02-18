@@ -13,8 +13,10 @@ vi.mock('@/lib/supabase/server', () => ({
         },
         from: () => ({
             select: () => ({
-                order: () => ({
-                    range: () => Promise.resolve({ data: [], error: null, count: 0 }),
+                eq: () => ({ // Added eq for user_id filtering
+                    order: () => ({
+                        range: () => Promise.resolve({ data: [], error: null, count: 0 }),
+                    }),
                 }),
             }),
             insert: () => ({
@@ -23,6 +25,7 @@ vi.mock('@/lib/supabase/server', () => ({
                 }),
             }),
         }),
+        rpc: () => Promise.resolve({ data: null, error: null }),
     }),
 }))
 

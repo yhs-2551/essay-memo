@@ -42,4 +42,28 @@ test.describe('AI Tier Limits', () => {
         await editor.submit()
         await editor.waitForSaveComplete()
     })
+
+    test('Free tier UI shows error when limit exceeded', async ({ page }) => {
+        await loginAs(page, FREE_USER.email, FREE_USER.password)
+
+        const editor = new BlogEditorPage(page)
+        await editor.goto()
+        await editor.dismissDraftToast()
+
+        // Mock the analyze request to fail with 403
+        await page.route('**/analyze', async (route) => {
+            await route.fulfill({
+                status: 403,
+                contentType: 'application/json',
+                body: JSON.stringify({ error: 'Daily consultation limit reached', tierInfo: 'free' }),
+            })
+        })
+
+        await editor.fillEssay('Limit Test', 'Content')
+        await editor.selectConsultationMode()
+        await editor.submit()
+
+        // Expect error toast
+        await expect(page.getByText('Daily consultation limit reached')).toBeVisible()
+    })
 })

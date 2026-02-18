@@ -10,13 +10,22 @@ const app = new Hono()
 // Get all posts
 app.get('/', async (c) => {
     const supabase = await createClient()
+
+    // [FIX] Auth check
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Please log in' }, 401)
+    }
+
     const query = c.req.query('q')
     const page = parseInt(c.req.query('page') || '1')
     const limit = parseInt(c.req.query('limit') || String(UI_CONFIG.PAGINATION_LIMIT))
     const from = (page - 1) * limit
     const to = from + limit - 1
 
-    let dbQuery = supabase.from('posts').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to)
+    let dbQuery = supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', user.id).order('created_at', { ascending: false }).range(from, to)
 
     if (query) {
         dbQuery = dbQuery.or(`title.ilike.%${query}%,content.ilike.%${query}%`)
@@ -40,6 +49,14 @@ app.get('/', async (c) => {
 app.get('/:id', async (c) => {
     const id = c.req.param('id')
     const supabase = await createClient()
+
+    // [FIX] Auth check
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+        return c.json({ error: 'Unauthorized: Please log in' }, 401)
+    }
 
     const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
 
