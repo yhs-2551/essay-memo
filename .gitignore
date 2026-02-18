@@ -45,6 +45,7 @@ pnpm-debug.log*
 # 내 작업 관련 md파일
 다음.md 
 추후개발계획.md
+현재까지작업내용.md
 
 #playwright 결과물 
 playwright-report/
