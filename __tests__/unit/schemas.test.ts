@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CreatePostSchema, UpdatePostSchema, CreateMemoSchema, AnalyzedDataSchema } from '@/lib/schemas'
+import { CreatePostSchema, UpdatePostSchema, CreateMemoSchema, AnalyzedDataSchema, ProfileSchema } from '@/lib/schemas'
 
 describe('Zod Schemas Validation', () => {
     describe('CreatePostSchema', () => {
@@ -9,6 +9,7 @@ describe('Zod Schemas Validation', () => {
                 content: 'Valid Content',
                 mode: 'standard',
                 persona: 'prism',
+                images: ['http://example.com/image.png']
             }
             const result = CreatePostSchema.safeParse(data)
             expect(result.success).toBe(true)
@@ -65,6 +66,33 @@ describe('Zod Schemas Validation', () => {
                 expect(result.error.flatten().fieldErrors.content).toContain('내용은 30,000자를 초과할 수 없습니다 (약 100KB)')
             }
         })
+
+        it('should fail if mode is invalid', () => {
+            const data = {
+                title: 'Valid Title',
+                content: 'Valid Content',
+                mode: 'invalid-mode',
+            }
+            const result = CreatePostSchema.safeParse(data)
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.error.flatten().fieldErrors.mode).toBeDefined()
+            }
+        })
+
+        it('should fail if images contain invalid URL', () => {
+            const data = {
+                title: 'Valid Title',
+                content: 'Valid Content',
+                mode: 'standard',
+                images: ['not-a-url']
+            }
+            const result = CreatePostSchema.safeParse(data)
+            expect(result.success).toBe(false)
+            if (!result.success) {
+                expect(result.error.flatten().fieldErrors.images).toBeDefined()
+            }
+        })
     })
 
     describe('UpdatePostSchema', () => {
@@ -107,38 +135,86 @@ describe('Zod Schemas Validation', () => {
     })
 
     describe('AnalyzedDataSchema', () => {
+        const validData = {
+            meta: {
+                model: 'gpt-4',
+                timestamp: new Date().toISOString(),
+                persona: 'prism',
+            },
+            sentiment: {
+                primaryEmotion_ko: '기쁨',
+                primaryEmotion_en: 'Joy',
+                intensity: 0.8,
+            },
+            philosophy: {
+                lens_ko: '실존주의',
+                lens_en: 'Existentialism',
+                summary_ko: '요약',
+                keywords_en: ['keyword'],
+            },
+            life_data: {
+                summary: '요약',
+                growth_point: '성장',
+                suggested_actions: ['action'],
+            },
+            vision: {
+                objects_ko: ['obj'],
+                objects_en: ['obj'],
+                mood_ko: 'mood',
+                mood_en: 'mood',
+            },
+        }
+
         it('should validate correct structure', () => {
-            const data = {
-                meta: {
-                    model: 'gpt-4',
-                    timestamp: new Date().toISOString(),
-                    persona: 'prism',
-                },
-                sentiment: {
-                    primaryEmotion_ko: '기쁨',
-                    primaryEmotion_en: 'Joy',
-                    intensity: 0.8,
-                },
-                philosophy: {
-                    lens_ko: '실존주의',
-                    lens_en: 'Existentialism',
-                    summary_ko: '요약',
-                    keywords_en: ['keyword'],
-                },
-                life_data: {
-                    summary: '요약',
-                    growth_point: '성장',
-                    suggested_actions: ['action'],
-                },
-                vision: {
-                    objects_ko: ['obj'],
-                    objects_en: ['obj'],
-                    mood_ko: 'mood',
-                    mood_en: 'mood',
-                },
-            }
+            const result = AnalyzedDataSchema.safeParse(validData)
+            expect(result.success).toBe(true)
+        })
+
+        it('should allow vision to be null', () => {
+            const data = { ...validData, vision: null }
             const result = AnalyzedDataSchema.safeParse(data)
             expect(result.success).toBe(true)
+        })
+    })
+
+    describe('ProfileSchema', () => {
+        it('should validate valid profile', () => {
+            const data = {
+                id: '123e4567-e89b-12d3-a456-426614174000',
+                email: 'test@example.com',
+                consultation_count: 5,
+                last_consultation_date: new Date().toISOString(),
+                subscription_tier: 'free',
+                preferences: { theme: 'dark' },
+            }
+            const result = ProfileSchema.safeParse(data)
+            expect(result.success).toBe(true)
+        })
+
+        it('should fail if id is not UUID', () => {
+            const data = {
+                id: 'not-uuid',
+                email: 'test@example.com',
+                consultation_count: 5,
+                last_consultation_date: null,
+                subscription_tier: 'free',
+                preferences: null,
+            }
+            const result = ProfileSchema.safeParse(data)
+            expect(result.success).toBe(false)
+        })
+
+        it('should fail if email is invalid', () => {
+            const data = {
+                id: '123e4567-e89b-12d3-a456-426614174000',
+                email: 'not-an-email',
+                consultation_count: 5,
+                last_consultation_date: null,
+                subscription_tier: 'free',
+                preferences: null,
+            }
+            const result = ProfileSchema.safeParse(data)
+            expect(result.success).toBe(false)
         })
     })
 })

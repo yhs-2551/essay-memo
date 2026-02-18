@@ -115,7 +115,7 @@ describe('use-auto-save Integration Tests', () => {
     })
 
     describe('복원 기능', () => {
-        it.skip('로컬 드래프트 복원', async () => {
+        it('로컬 드래프트 복원', async () => {
             // TODO: Fix mock setup
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
@@ -131,9 +131,10 @@ describe('use-auto-save Integration Tests', () => {
 
             const { result } = renderHook(() => useAutoSave('test-key', {}, 500))
 
-            const loaded = await result.current.loadDraft()
-
-            expect(loaded).toEqual({ title: '로컬 드래프트' })
+            await vi.waitFor(async () => {
+                const loaded = await result.current.loadDraft()
+                expect(loaded).toEqual({ title: '로컬 드래프트' })
+            })
         })
 
         it('서버 드래프트 복원 (로컬 없을 때)', async () => {
@@ -167,7 +168,7 @@ describe('use-auto-save Integration Tests', () => {
             })
         })
 
-        it.skip('레거시 드래프트 마이그레이션 (IndexedDB 구버전)', async () => {
+        it('레거시 드래프트 마이그레이션 (IndexedDB 구버전)', async () => {
             // TODO: Fix mock setup
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
@@ -184,16 +185,17 @@ describe('use-auto-save Integration Tests', () => {
 
             const { result } = renderHook(() => useAutoSave('test-key', {}, 500))
 
-            const loaded = await result.current.loadDraft()
-
-            expect(loaded).toEqual({ title: '레거시 드래프트' })
+            await vi.waitFor(async () => {
+                const loaded = await result.current.loadDraft()
+                expect(loaded).toEqual({ title: '레거시 드래프트' })
+            })
             expect(l1Storage.set).toHaveBeenCalledWith('user_user-123:test-key', legacyDraft)
             expect(l1Storage.remove).toHaveBeenCalledWith('test-key')
         })
     })
 
     describe('충돌 해결', () => {
-        it.skip('서버가 더 최신이면 서버 우선 (1초 이상 차이)', async () => {
+        it('서버가 더 최신이면 서버 우선 (1초 이상 차이)', async () => {
             // TODO: Fix mock setup
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
@@ -202,8 +204,11 @@ describe('use-auto-save Integration Tests', () => {
             const oldTimestamp = Date.now() - 5000 // 5초 전
             const newTimestamp = Date.now()
 
+            // Ensure local data is > 50 chars to trigger toast
+            const longLocalTitle = '로컬 구버전'.padEnd(60, '.')
+
             vi.mocked(l1Storage.get).mockResolvedValue({
-                data: { title: '로컬 구버전' },
+                data: { title: longLocalTitle },
                 timestamp: oldTimestamp,
                 version: 2,
             })
@@ -226,13 +231,14 @@ describe('use-auto-save Integration Tests', () => {
 
             const { result } = renderHook(() => useAutoSave('test-key', {}, 500))
 
-            const loaded = await result.current.loadDraft()
-
-            expect(loaded).toEqual({ title: '서버 신버전' })
+            await vi.waitFor(async () => {
+                const loaded = await result.current.loadDraft()
+                expect(loaded).toEqual({ title: '서버 신버전' })
+            })
             expect(toast.info).toHaveBeenCalledWith('다른 기기에서 작성된 최신 글을 불러왔습니다.')
         })
 
-        it.skip('로컬이 더 최신이면 로컬 우선', async () => {
+        it('로컬이 더 최신이면 로컬 우선', async () => {
             // TODO: Fix mock setup
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
@@ -265,9 +271,10 @@ describe('use-auto-save Integration Tests', () => {
 
             const { result } = renderHook(() => useAutoSave('test-key', {}, 500))
 
-            const loaded = await result.current.loadDraft()
-
-            expect(loaded).toEqual({ title: '로컬 신버전' })
+            await vi.waitFor(async () => {
+                const loaded = await result.current.loadDraft()
+                expect(loaded).toEqual({ title: '로컬 신버전' })
+            })
         })
 
         it('충돌 시 의미있는 로컬 데이터만 토스트 표시', async () => {
@@ -307,10 +314,17 @@ describe('use-auto-save Integration Tests', () => {
     })
 
     describe('드래프트 삭제', () => {
-        it.skip('로컬 및 서버 드래프트 모두 삭제', async () => {
+        it('로컬 및 서버 드래프트 모두 삭제', async () => {
             // TODO: Fix mock setup
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
+            })
+
+            // Mock get to return something so we can wait for auth
+            vi.mocked(l1Storage.get).mockResolvedValue({
+                data: { title: 'dummy' },
+                timestamp: Date.now(),
+                version: 2,
             })
 
             const deleteMock = vi.fn().mockResolvedValue({ error: null })
@@ -322,8 +336,10 @@ describe('use-auto-save Integration Tests', () => {
 
             const { result } = renderHook(() => useAutoSave('test-key', {}, 500))
 
-            await vi.waitFor(() => {
-                expect(result.current.clearDraft).toBeDefined()
+            // Wait for auth to settle by waiting for loadDraft to return data
+            await vi.waitFor(async () => {
+                const loaded = await result.current.loadDraft()
+                expect(loaded).toBeTruthy()
             })
 
             await result.current.clearDraft()
@@ -356,13 +372,13 @@ describe('use-auto-save Integration Tests', () => {
             )
         })
 
-        it.skip('서버 타임아웃 시 타임아웃 메시지 표시', async () => {
+        it('서버 타임아웃 시 타임아웃 메시지 표시', { timeout: 15000 }, async () => {
             // TODO: Fix timeout handling
             mockSupabase.auth.getUser.mockResolvedValue({
                 data: { user: { id: 'user-123' } },
             })
 
-            const upsertMock = vi.fn(() => new Promise((resolve) => setTimeout(resolve, 15000))) // 15초 대기
+            const upsertMock = vi.fn(() => new Promise((resolve) => setTimeout(resolve, 11000))) // 11초 대기 (Wait > 10s)
             mockSupabase.from.mockReturnValue({
                 upsert: upsertMock,
             } as any)
