@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 
 export function useSelection<T extends { id: string }>(items: T[]) {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-    const toggleSelect = useCallback((id: string) => {
+    const toggleSelect = (id: string) => {
         setSelectedIds((prev) => {
             const next = new Set(prev)
             if (next.has(id)) {
@@ -15,19 +15,19 @@ export function useSelection<T extends { id: string }>(items: T[]) {
             }
             return next
         })
-    }, [])
+    }
 
-    const selectAll = useCallback(() => {
+    const selectAll = () => {
         if (selectedIds.size === items.length) {
             setSelectedIds(new Set())
         } else {
             setSelectedIds(new Set(items.map((i) => i.id)))
         }
-    }, [items, selectedIds])
+    }
 
-    const clearSelection = useCallback(() => {
+    const clearSelection = () => {
         setSelectedIds(new Set())
-    }, [])
+    }
 
     return {
         selectedIds,

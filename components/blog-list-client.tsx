@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -208,13 +208,13 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
         }
     }
 
-    const filteredByDate = useMemo(() => {
+    const filteredByDate = (() => {
         if (!dateFilter) return posts
         return posts.filter((p) => format(new Date(p.created_at), 'yyyy-MM') === dateFilter)
-    }, [posts, dateFilter])
+    })()
 
-    const groups = useMemo(() => groupItemsByDate(filteredByDate), [filteredByDate])
-    const dateOptions = useMemo(() => getAvailableDates(posts), [posts])
+    const groups = groupItemsByDate(filteredByDate)
+    const dateOptions = getAvailableDates(posts)
 
     return (
         <div className="min-h-screen p-6 pt-24 relative">
