@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 /**
  * useLongPress Hook
@@ -11,14 +11,14 @@ export function useLongPress(callback: () => void, ms = 500) {
     const [startLongPress, setStartLongPress] = useState(false)
     const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-    const start = useCallback(() => {
+    const start = () => {
         setStartLongPress(true)
-    }, [])
+    }
 
-    const stop = useCallback(() => {
+    const stop = () => {
         setStartLongPress(false)
         if (timerRef.current) clearTimeout(timerRef.current)
-    }, [])
+    }
 
     useEffect(() => {
         if (startLongPress) {

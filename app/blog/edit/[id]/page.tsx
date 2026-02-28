@@ -1,55 +1,23 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { notFound, redirect } from 'next/navigation'
 import { BlogEditor } from '@/components/blog-editor'
-import { Background } from '@/components/background'
-import { Stars } from 'lucide-react'
 
-export default function EditPostPage() {
-    const { id } = useParams()
-    const [post, setPost] = useState<any>(null)
-    const [consultation, setConsultation] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
-    const router = useRouter()
+export default async function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
+    const supabase = await createClient()
 
-    useEffect(() => {
-        if (id) {
-            fetchPost()
-        }
-    }, [id])
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
 
-    const fetchPost = async () => {
-        try {
-            const res = await fetch(`/api/posts/${id}`)
-            if (res.ok) {
-                const data = await res.json()
-                setPost(data.post)
-                setConsultation(data.consultation)
-            } else {
-                router.push('/blog')
-            }
-        } catch (e) {
-            console.error(e)
-            router.push('/blog')
-        } finally {
-            setLoading(false)
-        }
-    }
+    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
 
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <Background />
-                <div className="text-center animate-pulse">
-                    <Stars className="h-10 w-10 mx-auto mb-4 text-purple-500" />
-                    <p className="text-muted-foreground">기록을 불러오는 중...</p>
-                </div>
-            </div>
-        )
-    }
+    if (error || !data) notFound()
 
-    if (!post) return null
+    const consultationData = (data as any).consultations
+    const consultation = Array.isArray(consultationData) ? consultationData[0] : consultationData
+    const { consultations: _removed, ...post } = data as any
 
     return (
         <BlogEditor

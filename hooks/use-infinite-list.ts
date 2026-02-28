@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface UseInfiniteListOptions<T> {
     initialItems: T[]
@@ -101,11 +101,9 @@ export function useInfiniteList<T extends { id: string; created_at: string }>(
     }, [loadingMore, hasMore])
 
     // ===== Search Handler =====
-    // [FIX] Track previous searchQuery to only reset when it actually changes
     const prevSearchQuery = useRef(searchQuery)
 
     useEffect(() => {
-        // Guard: Skip if searchQuery hasn't actually changed
         if (prevSearchQuery.current === searchQuery) return
 
         prevSearchQuery.current = searchQuery
@@ -115,10 +113,10 @@ export function useInfiniteList<T extends { id: string; created_at: string }>(
 
     // ===== Refresh Handler =====
 
-    const refreshItems = useCallback(() => {
+    const refreshItems = () => {
         setPage(1)
         setItems([])
-    }, [])
+    }
 
     return {
         items,

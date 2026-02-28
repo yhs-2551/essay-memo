@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -155,16 +155,14 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
     const [isBulkDelete, setIsBulkDelete] = useState(false)
 
     // Optimize: Computation
-    const filteredMemos = useMemo(() => {
+    const filteredMemos = (() => {
         if (!dateFilter) return memos
         return memos.filter((m) => m.created_at.startsWith(dateFilter))
-    }, [memos, dateFilter])
+    })()
 
-    const groups: DateGroup[] = useMemo(() => {
-        return groupItemsByDate(filteredMemos)
-    }, [filteredMemos])
+    const groups: DateGroup[] = groupItemsByDate(filteredMemos)
 
-    const dateOptions = useMemo(() => getAvailableDates(memos), [memos])
+    const dateOptions = getAvailableDates(memos)
 
     const handleSave = async (content: string) => {
         try {
