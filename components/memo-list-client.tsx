@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'

@@ -41,7 +41,7 @@ export function useInfiniteList<T extends { id: string; created_at: string }>(
     const [hasMore, setHasMore] = useState(initialItems.length >= limit)
     const [error, setError] = useState(false)
     const [dateFilter, setDateFilter] = useState('')
-    const observerTarget = useRef<HTMLDivElement>(null)
+    const observerTarget = useRef<HTMLDivElement>(null!)
     const isFirstRender = useRef(true)
 
     // ===== Fetch Logic =====

@@ -1,13 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { BlogClientPage } from '@/components/blog-list-client'
 import { Post } from '@/lib/types'
 
-// Server Component
 export default async function BlogPage() {
     const supabase = await createClient()
 
-    // Fetch initial posts (Page 1) on the server for best FCP & SEO
-    const { data } = await supabase.from('posts').select('*').order('created_at', { ascending: false }).range(0, 19)
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
+
+    const { data } = await supabase.from('posts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).range(0, 19)
 
     const initialPosts = (data as Post[]) || []
 

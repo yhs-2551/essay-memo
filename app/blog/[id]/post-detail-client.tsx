@@ -179,7 +179,7 @@ export function PostDetailClient({ post, consultation }: PostData) {
 
                                     {/* User Choice Section */}
                                     <div className="mt-8 pt-4 border-t border-slate-200 dark:border-zinc-900/50">
-                                        <span className="block text-xs text-amber-500/80 dark:text-amber-700 mb-3 flex items-center gap-1 font-bold tracking-wider uppercase">
+                                        <span className="text-xs text-amber-500/80 dark:text-amber-700 mb-3 flex items-center gap-1 font-bold tracking-wider uppercase">
                                             <Sparkles className="w-3 h-3" />
                                             프리즘의 실천 제안
                                         </span>
