@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { createPost, updatePost } from '@/server/actions/posts'
 
 import { useAutoSave } from '@/hooks/use-auto-save'
 import { useImageUpload } from '@/hooks/use-image-upload'
@@ -133,9 +134,6 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     }
 
     const savePostToDatabase = async () => {
-        const url = isEditing ? `/api/posts/${initialData?.id}` : '/api/posts'
-        const method = isEditing ? 'PATCH' : 'POST'
-
         const payload = {
             title,
             content,
@@ -144,16 +142,12 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
             images: uploadedImages,
         }
 
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        })
+        const result = isEditing ? await updatePost(initialData!.id!, payload) : await createPost(payload)
 
-        const post = await res.json()
-        if (!post?.id) throw new Error('저장 실패')
+        if (result.error) throw new Error(result.error)
+        if (!result.data?.id) throw new Error('저장 실패')
 
-        return post
+        return result.data
     }
 
     const runAIAnalysis = async (postId: string): Promise<void> => {

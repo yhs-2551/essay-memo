@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createMemo, updateMemo, deleteMemo, bulkDeleteMemos } from '@/server/actions/memos'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -166,16 +167,10 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
     const handleSave = async (content: string) => {
         try {
-            const res = await fetch('/api/memos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content }),
-            })
-            if (res.ok) {
-                const newMemo = await res.json()
-                setMemos([newMemo, ...memos])
-                toast.success('글이 작성되었습니다.')
-            }
+            const result = await createMemo({ content })
+            if (result.error) throw new Error(result.error)
+            setMemos([result.data, ...memos])
+            toast.success('글이 작성되었습니다.')
         } catch (e) {
             console.error(e)
             toast.error('저장 실패')
@@ -184,16 +179,10 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
     const handleUpdate = async (id: string, content: string) => {
         try {
-            const res = await fetch(`/api/memos/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content }),
-            })
-            if (res.ok) {
-                const updatedMemo = await res.json()
-                setMemos(memos.map((m) => (m.id === id ? updatedMemo : m)))
-                toast.success('기억이 수정되었습니다.')
-            }
+            const result = await updateMemo(id, { content })
+            if (result.error) throw new Error(result.error)
+            setMemos(memos.map((m) => (m.id === id ? result.data : m)))
+            toast.success('기억이 수정되었습니다.')
         } catch (e) {
             console.error(e)
             toast.error('수정 실패')
@@ -212,19 +201,15 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
     // ===== Helper Functions (Clean Code: SRP) =====
 
     const executeSingleMemoDelete = async (id: string) => {
-        const res = await fetch(`/api/memos/${id}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Delete failed')
+        const result = await deleteMemo(id)
+        if (result.error) throw new Error(result.error)
         setMemos(memos.filter((m) => m.id !== id))
         if (selectedIds.has(id)) toggleSelect(id)
     }
 
     const executeBulkMemoDelete = async (ids: string[]) => {
-        const res = await fetch('/api/memos/bulk-delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids }),
-        })
-        if (!res.ok) throw new Error('Bulk delete failed')
+        const result = await bulkDeleteMemos(ids)
+        if (result.error) throw new Error(result.error)
         setMemos(memos.filter((m) => !selectedIds.has(m.id)))
         clearSelection()
     }

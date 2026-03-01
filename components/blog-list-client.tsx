@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { deletePost, bulkDeletePosts } from '@/server/actions/posts'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -167,18 +168,14 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
     // ===== Helper Functions (Clean Code: SRP) =====
 
     const executeSingleDelete = async (id: string) => {
-        const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('Delete failed')
+        const result = await deletePost(id)
+        if (result.error) throw new Error(result.error)
         setPosts((prev) => prev.filter((p) => p.id !== id))
     }
 
     const executeBulkDelete = async (ids: string[]) => {
-        const res = await fetch('/api/posts/bulk-delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids }),
-        })
-        if (!res.ok) throw new Error('Bulk delete failed')
+        const result = await bulkDeletePosts(ids)
+        if (result.error) throw new Error(result.error)
         setPosts((prev) => prev.filter((p) => !ids.includes(p.id)))
         clearSelection()
     }
