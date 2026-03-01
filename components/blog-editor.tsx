@@ -56,7 +56,7 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     useNavigationWarning(hasUnsavedChanges)
 
     const autoSaveKey = isEditing ? `draft-edit-post-${initialData?.id}` : 'draft-new-post'
-    const { isSaving, lastSavedAt, loadDraft, clearDraft } = useAutoSave(autoSaveKey, { title, content, mode }, 2000)
+    const { isSaving, lastSavedAt, isAuthReady, loadDraft, clearDraft } = useAutoSave(autoSaveKey, { title, content, mode }, 2000)
 
     const { handlePaste, isUploading } = useImageUpload()
 
@@ -70,10 +70,16 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
     useEffect(() => {
         setMounted(true)
         if (!isEditing) {
+            // Auth 미준비 시 대기 (storageKey 생성 전)
+            if (!isAuthReady) return
+
+            // StrictMode guard: 한 번만 실행
+            if (toastShownRef.current) return
+            toastShownRef.current = true
+
             const load = async () => {
                 const draft = await loadDraft()
                 if (draft && (draft.title || draft.content)) {
-                    // [UX Upgrade] Don't auto-load. Ask first.
                     toast('이전에 작성하던 글이 발견되었습니다.', {
                         description: '작성하던 내용을 복구하시겠습니까?',
                         action: {
@@ -88,18 +94,17 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
                         cancel: {
                             label: '삭제',
                             onClick: () => {
-                                // Clear draft if user rejects
                                 clearDraft()
                                 toast.info('임시 저장된 글을 삭제했습니다.')
                             },
                         },
-                        duration: 8000, // Give user enough time
+                        duration: 8000,
                     })
                 }
             }
             load()
         }
-    }, [loadDraft, isEditing])
+    }, [isAuthReady, loadDraft, clearDraft, isEditing])
 
     // ===== Helper Functions (Clean Code: SRP) =====
 
@@ -200,22 +205,35 @@ export function BlogEditor({ initialData, initialConsultation, isEditing = false
         }
 
         setLoading(true)
+        setLoading(true)
+        let savedPostId: string | null = null
+
         try {
             const post = await savePostToDatabase()
+            savedPostId = post.id
             clearDraft()
 
             if (willAnalyze) {
-                await runAIAnalysis(post.id)
+                try {
+                    await runAIAnalysis(post.id)
+                } catch (aiError) {
+                    // AI 분석 실패는 이미 runAIAnalysis 내부에서 toast 처리됨
+                    // 여기서는 에러를 무시하고 정상 화면 이동 진행
+                    console.warn('AI Analysis failed but post was saved')
+                }
             }
 
             toast.success(isEditing ? '수정되었습니다.' : '저장되었습니다.')
-            router.refresh()
-            router.replace(`/blog/${post.id}`)
         } catch (e) {
             console.error(e)
             toast.error('저장 중 오류가 발생했습니다.')
         } finally {
             setLoading(false)
+            if (savedPostId) {
+                // 저장 성공했으면 무조건 상세 페이지로 이동
+                router.refresh()
+                router.replace(`/blog/${savedPostId}`)
+            }
         }
     }
 

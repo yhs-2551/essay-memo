@@ -37,12 +37,13 @@ export function MemoEditor({
     const [mounted, setMounted] = useState(false)
     const { handlePaste, isUploading } = useImageUpload()
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const draftCheckedRef = useRef(false)
 
     const hasUnsavedChanges = content !== (initialContent || '') && content.trim() !== ''
     useNavigationWarning(hasUnsavedChanges)
 
     // [Orbit Sync Engine]: Auto-Save Hook Integration
-    const { isSaving, loadDraft, clearDraft } = useAutoSave<{ content: string; images: string[] }>(
+    const { isSaving, isAuthReady, loadDraft, clearDraft } = useAutoSave<{ content: string; images: string[] }>(
         'draft-memo-new',
         { content, images: uploadedImages },
         2000
@@ -53,6 +54,13 @@ export function MemoEditor({
         if (autoFocus) {
             textareaRef.current?.focus()
         }
+
+        // Auth 미준비 시 대기 (storageKey 생성 전)
+        if (!isAuthReady) return
+
+        // StrictMode guard: 한 번만 실행
+        if (draftCheckedRef.current) return
+        draftCheckedRef.current = true
 
         // Load Draft
         const restoreDraft = async () => {
@@ -72,7 +80,7 @@ export function MemoEditor({
             }
         }
         restoreDraft()
-    }, [autoFocus, loadDraft, clearDraft])
+    }, [autoFocus, isAuthReady, loadDraft, clearDraft])
 
     const handleSave = async () => {
         if (!content.trim()) return

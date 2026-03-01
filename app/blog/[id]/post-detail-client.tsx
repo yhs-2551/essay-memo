@@ -283,12 +283,16 @@ export function PostDetailClient({ post, consultation }: PostData) {
                                 </div>
 
                                 <div className="mt-12 pt-6 border-t border-stone-200 dark:border-stone-800 flex justify-end">
-                                    <div className="text-sm text-stone-400 font-serif italic flex items-center gap-2">
-                                        <Quote className="w-4 h-4" />
+                                    <div className="text-sm text-stone-400 font-serif flex items-center gap-1.5">
                                         {(() => {
                                             const personaId = cData?.meta?.persona || 'prism'
-                                            const personaName = PERSONAS.find((p) => p.id === personaId)?.name || '프리즘'
-                                            return `${personaName}의 시선: ${cData?.philosophy?.lens_ko}`
+                                            const personaObj = PERSONAS.find((p) => p.id === personaId) || PERSONAS[0]
+                                            return (
+                                                <>
+                                                    <span className="text-base">{personaObj.icon}</span>
+                                                    <span>{personaObj.name}</span>
+                                                </>
+                                            )
                                         })()}
                                     </div>
                                 </div>

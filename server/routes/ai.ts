@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { logActivity } from '@/lib/logger'
@@ -86,10 +87,15 @@ app.post(
         const textContent = post.content.replace(imageRegex, '').trim()
 
         try {
-            // 4. Supabase Edge Function 호출
-            const { data, error } = await supabase.functions.invoke('analyze-entry', {
+            // 4. Supabase Edge Function 호출 (Admin 권한으로 안전하게 Edge Function 호출)
+            // 클라이언트 쿠키가 아닌, 서버의 서비스 롤 키를 사용해 auth 문제를 우회합니다.
+            const supabaseAdmin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+            const invokeOptions = {
                 body: { record: { ...post, content: textContent, images: imageUrls, persona } },
-            })
+            }
+
+            const { data, error } = await supabaseAdmin.functions.invoke('analyze-entry', invokeOptions)
 
             if (error) {
                 console.error('Edge Function Error:', error)

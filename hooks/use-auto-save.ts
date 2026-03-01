@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { l1Storage } from '@/utils/indexed-db'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ interface AutoSaveResult<T> {
     isSaving: boolean
     lastSavedAt: Date | null
     syncStatus: 'synced' | 'local-only' | 'uploading' | 'error'
+    isAuthReady: boolean
     loadDraft: () => Promise<T | null>
     clearDraft: () => void
 }
@@ -43,6 +44,14 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         return userId ? `user_${userId}:${key}` : `guest:${key}`
     })()
 
+    // Stable ref for storageKey to avoid stale closures
+    const storageKeyRef = useRef(storageKey)
+    storageKeyRef.current = storageKey
+
+    // Stable ref for userId
+    const userIdRef = useRef(userId)
+    userIdRef.current = userId
+
     // Monitor Auth State
     useEffect(() => {
         const initAuth = async () => {
@@ -71,77 +80,77 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         version: number
     }
 
-    // --- L1: IndexedDB (Fast & Async) ---
-    const saveToLocal = async (content: T) => {
-        if (!storageKey) return
+    // --- L1: IndexedDB (Fast & Async) --- Stable reference via useCallback
+    const saveToLocal = useCallback(async (content: T) => {
+        const currentKey = storageKeyRef.current
+        if (!currentKey) return
 
         try {
-            const payload: StorageWrapper = {
+            const payload = {
                 data: content,
                 timestamp: Date.now(),
                 version: 2,
             }
-            await l1Storage.set(storageKey, payload)
+            await l1Storage.set(currentKey, payload)
             setLastSavedAt(new Date())
         } catch (e) {
             console.warn('Orbit Sync: L1 Write Failed', e)
         }
-    }
+    }, [])
 
-    // --- L2: Server Storage (Secure & Persistent) ---
-    const saveToServer = async (content: T) => {
-        if (!userId) {
-            setSyncStatus('local-only')
-            return
-        }
-
-        console.log('Orbit Sync: Starting L2 Save...', key)
-        try {
-            setSyncStatus('uploading')
-
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Orbit Sync: L2 Timeout')), 10000))
-
-            const uploadPromise = (async () => {
-                const { error } = await supabase.from('drafts').upsert(
-                    {
-                        user_id: userId,
-                        key: key,
-                        data: content as any,
-                        updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: 'user_id,key' }
-                )
-
-                if (error) throw error
-                console.log('Orbit Sync: L2 Save Success')
-                setSyncStatus('synced')
-            })()
-
-            await Promise.race([uploadPromise, timeoutPromise])
-        } catch (e: any) {
-            console.error('Orbit Sync: L2 Write Failed', e)
-
-            if (e.message === 'Orbit Sync: L2 Timeout') {
-                setSyncStatus('error')
-                toast.error('서버 응답 지연: 로컬에 안전하게 저장됨')
-            } else {
-                setSyncStatus('error')
-                toast.error(`저장 오류: ${e.message || e.details || '알 수 없는 오류'}`)
+    // --- L2: Server Storage (Secure & Persistent) --- Stable reference via useCallback
+    const saveToServer = useCallback(
+        async (content: T) => {
+            const currentUserId = userIdRef.current
+            if (!currentUserId) {
+                setSyncStatus('local-only')
+                return
             }
-        } finally {
-            console.log('Orbit Sync: Finished')
-            setIsSaving(false)
-        }
-    }
+
+            try {
+                setSyncStatus('uploading')
+
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Orbit Sync: L2 Timeout')), 10000))
+
+                const uploadPromise = (async () => {
+                    const { error } = await supabaseRef.current.from('drafts').upsert(
+                        {
+                            user_id: currentUserId,
+                            key: key,
+                            data: content as any,
+                            updated_at: new Date().toISOString(),
+                        },
+                        { onConflict: 'user_id,key' }
+                    )
+
+                    if (error) throw error
+                    setSyncStatus('synced')
+                })()
+
+                await Promise.race([uploadPromise, timeoutPromise])
+            } catch (e: any) {
+                if (e.message === 'Orbit Sync: L2 Timeout') {
+                    setSyncStatus('error')
+                    toast.error('서버 응답 지연: 로컬에 안전하게 저장됨')
+                } else {
+                    setSyncStatus('error')
+                    toast.error(`저장 오류: ${e.message || e.details || '알 수 없는 오류'}`)
+                }
+            } finally {
+                setIsSaving(false)
+            }
+        },
+        [key]
+    )
 
     // ===== Helper Functions (Clean Code: SRP) =====
 
     /**
      * Read draft from L1 Storage (IndexedDB)
      */
-    const readLocalStorage = async (storageKey: string) => {
+    const readLocalStorage = async (sk: string) => {
         try {
-            const parsed = (await l1Storage.get(storageKey)) as StorageWrapper | null
+            const parsed = (await l1Storage.get(sk)) as StorageWrapper | null
             if (parsed && typeof parsed === 'object' && 'data' in parsed) {
                 return { data: parsed.data, timestamp: parsed.timestamp }
             }
@@ -153,17 +162,13 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
 
     /**
      * Migrate legacy drafts to new isolated format
-     * Legacy formats:
-     * 1. IndexedDB with non-prefixed key (e.g., "draft-new-post")
-     * 2. localStorage (very old, pre-IndexedDB era)
      */
-    const migrateLegacyDraft = async (storageKey: string, key: string) => {
+    const migrateLegacyDraft = async (sk: string, legacyKey: string) => {
         try {
-            const legacyParsed = (await l1Storage.get(key)) as StorageWrapper | null
+            const legacyParsed = (await l1Storage.get(legacyKey)) as StorageWrapper | null
             if (legacyParsed && typeof legacyParsed === 'object' && 'data' in legacyParsed) {
-                console.log('Orbit Sync: Migrating legacy draft to isolated storage')
-                await l1Storage.set(storageKey, legacyParsed)
-                await l1Storage.remove(key)
+                await l1Storage.set(sk, legacyParsed)
+                await l1Storage.remove(legacyKey)
                 return { data: legacyParsed.data, timestamp: legacyParsed.timestamp }
             }
         } catch (e) {
@@ -171,13 +176,13 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         }
 
         try {
-            const legacyRaw = localStorage.getItem(key)
+            const legacyRaw = localStorage.getItem(legacyKey)
             if (legacyRaw) {
                 const parsedOld = JSON.parse(legacyRaw)
                 const data = parsedOld.data || parsedOld
                 const timestamp = Date.now()
-                await l1Storage.set(storageKey, { data, timestamp, version: 2 })
-                localStorage.removeItem(key)
+                await l1Storage.set(sk, { data, timestamp, version: 2 })
+                localStorage.removeItem(legacyKey)
                 return { data, timestamp }
             }
         } catch (e) {
@@ -190,15 +195,16 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
     /**
      * Read draft from L2 Storage (Supabase)
      */
-    const readServerStorage = async (key: string) => {
-        if (!userId) return null
+    const readServerStorage = async (queryKey: string) => {
+        const currentUserId = userIdRef.current
+        if (!currentUserId) return null
 
         try {
             const { data: serverDraft } = await supabase
                 .from('drafts')
                 .select('data, updated_at')
-                .eq('user_id', userId)
-                .eq('key', key)
+                .eq('user_id', currentUserId)
+                .eq('key', queryKey)
                 .single()
 
             if (serverDraft) {
@@ -226,8 +232,6 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         if (!local) return server.data
 
         if (server.timestamp > local.timestamp + 1000) {
-            console.log('Orbit Sync: Remote logic prevails. Syncing down.')
-
             const hasLocalContent = local.data && JSON.stringify(local.data).length > 50
             if (hasLocalContent) {
                 toast.info('다른 기기에서 작성된 최신 글을 불러왔습니다.')
@@ -240,29 +244,28 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         return local.data
     }
 
-    // ===== Smart Load Strategy (Orchestrator) =====
+    // ===== Smart Load Strategy (Orchestrator) — Stable ref via useCallback =====
 
-    const loadDraft = async (): Promise<T | null> => {
+    const loadDraft = useCallback(async (): Promise<T | null> => {
         if (typeof window === 'undefined') return null
-        if (!storageKey) return null
+        const currentKey = storageKeyRef.current
+        if (!currentKey) return null
 
-        let localData = await readLocalStorage(storageKey)
+        let localData = await readLocalStorage(currentKey)
 
         if (!localData) {
-            localData = await migrateLegacyDraft(storageKey, key)
+            localData = await migrateLegacyDraft(currentKey, key)
         }
 
         const serverData = await readServerStorage(key)
 
         return resolveConflict(localData, serverData)
-    }
+    }, [key])
 
     // --- Online Recovery (Edge Case: Offline -> Online) ---
     useEffect(() => {
         const handleOnline = () => {
-            console.log('Orbit Sync: Back Online. Triggering sync.')
             toast.info('네트워크 연결이 복구되었습니다. 저장 중...', { icon: '📡' })
-            // Force immediate save
             saveToServer(data)
         }
         window.addEventListener('online', handleOnline)
@@ -280,11 +283,13 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
             return
         }
 
-        // Block auto-save until we know the user identity (to prevent writing to guest:key incorrectly)
+        // Block auto-save until we know the user identity
         if (!isAuthReady) return
 
-        // Dependency 'serializedData' ensures this ONLY runs when content actually changes.
+        // Skip if data hasn't actually changed (prevents StrictMode double-fire)
+        if (serializedData === lastSerializedData.current) return
         lastSerializedData.current = serializedData
+
         setIsSaving(true)
 
         // 1. L1 Save (Throttle 500ms)
@@ -304,20 +309,22 @@ export function useAutoSave<T>(key: string, data: T, delay: number = 2000): Auto
         }
     }, [serializedData, delay, saveToLocal, saveToServer, isAuthReady])
 
-    const clearDraft = async () => {
-        if (storageKey) await l1Storage.remove(storageKey)
+    const clearDraft = useCallback(async () => {
+        const currentKey = storageKeyRef.current
+        if (currentKey) await l1Storage.remove(currentKey)
         await l1Storage.remove(key)
 
         setLastSavedAt(null)
 
-        if (userId) {
+        const currentUserId = userIdRef.current
+        if (currentUserId) {
             try {
-                await supabase.from('drafts').delete().match({ user_id: userId, key: key })
+                await supabaseRef.current.from('drafts').delete().match({ user_id: currentUserId, key: key })
             } catch (e) {
                 console.warn('Orbit Sync: Failed to clear L2', e)
             }
         }
-    }
+    }, [key])
 
-    return { isSaving, lastSavedAt, syncStatus, loadDraft, clearDraft }
+    return { isSaving, lastSavedAt, syncStatus, isAuthReady, loadDraft, clearDraft }
 }
