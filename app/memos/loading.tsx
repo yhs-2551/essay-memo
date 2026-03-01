@@ -1,7 +1,6 @@
 import { MemoListSkeleton } from '@/components/skeletons'
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
-import { SearchInput } from '@/components/ui/search-input'
 import { ArrowLeft } from 'lucide-react'
 
 export default function Loading() {

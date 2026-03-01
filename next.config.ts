@@ -1,6 +1,8 @@
-const config = {
+import type { NextConfig } from 'next'
+
+const config: NextConfig = {
     // 1. 개발 모드에서 2번 렌더링/실행되는 것 방지 (운영과 동일하게 1번만 실행)
-    reactStrictMode: false,
+    reactStrictMode: true,
 
     // 2. SWC 컴파일러로 코드 압축 (속도 향상)
     // swcMinify: true, // Next.js 13+ defaults to true
@@ -22,8 +24,8 @@ const config = {
             },
         ],
     },
+    reactCompiler: true,
     experimental: {
-        reactCompiler: true,
         optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
     },
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createMemo, updateMemo, deleteMemo, bulkDeleteMemos } from '@/server/actions/memos'
+
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -167,9 +167,14 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
     const handleSave = async (content: string) => {
         try {
-            const result = await createMemo({ content })
-            if (result.error) throw new Error(result.error)
-            setMemos([result.data, ...memos])
+            const res = await fetch('/api/memos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content }),
+            })
+            if (!res.ok) throw new Error('저장 실패')
+            const data = await res.json()
+            setMemos([data, ...memos])
             toast.success('글이 작성되었습니다.')
         } catch (e) {
             console.error(e)
@@ -179,9 +184,14 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
 
     const handleUpdate = async (id: string, content: string) => {
         try {
-            const result = await updateMemo(id, { content })
-            if (result.error) throw new Error(result.error)
-            setMemos(memos.map((m) => (m.id === id ? result.data : m)))
+            const res = await fetch(`/api/memos/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content }),
+            })
+            if (!res.ok) throw new Error('수정 실패')
+            const data = await res.json()
+            setMemos(memos.map((m) => (m.id === id ? data : m)))
             toast.success('기억이 수정되었습니다.')
         } catch (e) {
             console.error(e)
@@ -201,15 +211,25 @@ export function MemoClientPage({ initialMemos }: MemoClientPageProps) {
     // ===== Helper Functions (Clean Code: SRP) =====
 
     const executeSingleMemoDelete = async (id: string) => {
-        const result = await deleteMemo(id)
-        if (result.error) throw new Error(result.error)
+        const res = await fetch(`/api/memos/${id}`, { method: 'DELETE' })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}))
+            throw new Error(errorData.error || '삭제 실패')
+        }
         setMemos(memos.filter((m) => m.id !== id))
         if (selectedIds.has(id)) toggleSelect(id)
     }
 
     const executeBulkMemoDelete = async (ids: string[]) => {
-        const result = await bulkDeleteMemos(ids)
-        if (result.error) throw new Error(result.error)
+        const res = await fetch('/api/memos/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}))
+            throw new Error(errorData.error || '삭제 실패')
+        }
         setMemos(memos.filter((m) => !selectedIds.has(m.id)))
         clearSelection()
     }
