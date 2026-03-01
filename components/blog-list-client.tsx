@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { deletePost, bulkDeletePosts } from '@/server/actions/posts'
+
 import { Background } from '@/components/background'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -168,14 +168,24 @@ export function BlogClientPage({ initialPosts }: BlogClientPageProps) {
     // ===== Helper Functions (Clean Code: SRP) =====
 
     const executeSingleDelete = async (id: string) => {
-        const result = await deletePost(id)
-        if (result.error) throw new Error(result.error)
+        const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}))
+            throw new Error(errorData.error || '삭제 실패')
+        }
         setPosts((prev) => prev.filter((p) => p.id !== id))
     }
 
     const executeBulkDelete = async (ids: string[]) => {
-        const result = await bulkDeletePosts(ids)
-        if (result.error) throw new Error(result.error)
+        const res = await fetch('/api/posts/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}))
+            throw new Error(errorData.error || '삭제 실패')
+        }
         setPosts((prev) => prev.filter((p) => !ids.includes(p.id)))
         clearSelection()
     }

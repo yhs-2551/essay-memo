@@ -7,13 +7,13 @@ import { toast } from 'sonner'
 import { MarkdownContent } from '@/components/markdown-content'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { createClient } from '@/lib/supabase/client'
 import { format } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Activity, ArrowLeft, CheckCircle2, Quote, Sparkles, Stars } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { GalleryLightbox } from '@/components/gallery-lightbox'
+import { PERSONAS } from '@/lib/constants'
 
 type PostData = {
     post: {
@@ -42,7 +42,6 @@ export function PostDetailClient({ post, consultation }: PostData) {
     const [selectedAction, setSelectedAction] = useState<string | null>(consultation?.analysis_data?.life_data?.selected_action || null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [customInput, setCustomInput] = useState('')
-    const supabase = createClient()
 
     const openCustomInputDialog = (initialValue: string = '') => {
         setCustomInput(initialValue)
@@ -56,20 +55,13 @@ export function PostDetailClient({ post, consultation }: PostData) {
         setIsDialogOpen(false)
 
         try {
-            const currentAnalysisData = consultation.analysis_data
-            if (!currentAnalysisData || !currentAnalysisData.life_data) return
+            const res = await fetch(`/api/posts/${post.id}/selected-action`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selectedAction: action }),
+            })
 
-            const updatedAnalysisData = {
-                ...currentAnalysisData,
-                life_data: {
-                    ...currentAnalysisData.life_data,
-                    selected_action: action,
-                },
-            }
-
-            const { error } = await supabase.from('consultations').update({ analysis_data: updatedAnalysisData }).eq('post_id', post.id)
-
-            if (error) throw error
+            if (!res.ok) throw new Error('Failed to save')
 
             toast.success('오늘의 문장이 안전하게 기록되었습니다.')
         } catch (e) {
@@ -295,15 +287,8 @@ export function PostDetailClient({ post, consultation }: PostData) {
                                         <Quote className="w-4 h-4" />
                                         {(() => {
                                             const personaId = cData?.meta?.persona || 'prism'
-                                            const names: Record<string, string> = {
-                                                prism: '프리즘의 시선',
-                                                nietzsche: '니체의 시선',
-                                                aurelius: '아우렐리우스의 시선',
-                                                jung: '칼 융의 시선',
-                                                buddha: '붓다의 시선',
-                                                epictetus: '에픽테토스의 시선',
-                                            }
-                                            return `${names[personaId] || '프리즘의 시선'}: ${cData?.philosophy?.lens_ko}`
+                                            const personaName = PERSONAS.find((p) => p.id === personaId)?.name || '프리즘'
+                                            return `${personaName}의 시선: ${cData?.philosophy?.lens_ko}`
                                         })()}
                                     </div>
                                 </div>

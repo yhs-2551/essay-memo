@@ -25,7 +25,12 @@ app.get('/', async (c) => {
     const from = (page - 1) * limit
     const to = from + limit - 1
 
-    let dbQuery = supabase.from('posts').select('*', { count: 'exact' }).eq('user_id', user.id).order('created_at', { ascending: false }).range(from, to)
+    let dbQuery = supabase
+        .from('posts')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
     if (query) {
         dbQuery = dbQuery.or(`title.ilike.%${query}%,content.ilike.%${query}%`)
@@ -154,20 +159,15 @@ app.delete('/:id', async (c) => {
     const id = c.req.param('id')
     const supabase = await createClient()
 
-    // [DEBUG] Check authenticated user
     const {
         data: { user },
-        error: authError,
     } = await supabase.auth.getUser()
-    console.log('[API] delete/:id - User:', user?.id || 'NOT AUTHENTICATED', 'PostId:', id)
 
     if (!user) {
         return c.json({ error: 'Unauthorized: Not logged in' }, 401)
     }
 
     const { error, count } = await supabase.from('posts').delete({ count: 'exact' }).eq('id', id)
-
-    console.log('[API] delete/:id - Deleted count:', count, 'Error:', error?.message || 'none')
 
     if (error) return c.json({ error: error.message }, 500)
 
@@ -184,12 +184,9 @@ app.post('/bulk-delete', zValidator('json', z.object({ ids: z.array(z.string().u
     const { ids } = c.req.valid('json')
     const supabase = await createClient()
 
-    // [DEBUG] Check authenticated user
     const {
         data: { user },
-        error: authError,
     } = await supabase.auth.getUser()
-    console.log('[API] bulk-delete - User:', user?.id || 'NOT AUTHENTICATED', 'AuthError:', authError?.message || 'none')
 
     if (!user) {
         return c.json({ error: 'Unauthorized: Not logged in' }, 401)
@@ -197,12 +194,9 @@ app.post('/bulk-delete', zValidator('json', z.object({ ids: z.array(z.string().u
 
     const { error, count } = await supabase.from('posts').delete({ count: 'exact' }).in('id', ids)
 
-    console.log('[API] bulk-delete - Deleted count:', count, 'Error:', error?.message || 'none')
-
     if (error) return c.json({ error: error.message }, 500)
 
     if (count === 0) {
-        console.log('[API] bulk-delete - WARNING: 0 rows deleted. RLS policy may be blocking.')
         return c.json({ error: 'No posts were deleted. You may not have permission.' }, 403)
     }
 
@@ -210,5 +204,59 @@ app.post('/bulk-delete', zValidator('json', z.object({ ids: z.array(z.string().u
 
     return c.json({ success: true, deletedCount: count })
 })
+
+// Update selected action for a post's consultation
+app.patch(
+    '/:id/selected-action',
+    zValidator(
+        'json',
+        z.object({
+            selectedAction: z.string().min(1).max(500),
+        })
+    ),
+    async (c) => {
+        const postId = c.req.param('id')
+        const { selectedAction } = c.req.valid('json')
+        const supabase = await createClient()
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+            return c.json({ error: 'Unauthorized' }, 401)
+        }
+
+        const { data: consultation, error: fetchError } = await supabase
+            .from('consultations')
+            .select('analysis_data')
+            .eq('post_id', postId)
+            .single()
+
+        if (fetchError || !consultation) {
+            return c.json({ error: 'Consultation not found' }, 404)
+        }
+
+        const currentData = (consultation as any).analysis_data
+        if (!currentData?.life_data) {
+            return c.json({ error: 'No life_data in consultation' }, 400)
+        }
+
+        const updatedData = {
+            ...currentData,
+            life_data: {
+                ...currentData.life_data,
+                selected_action: selectedAction,
+            },
+        }
+
+        const { error: updateError } = await (supabase.from('consultations') as any)
+            .update({ analysis_data: updatedData })
+            .eq('post_id', postId)
+
+        if (updateError) return c.json({ error: updateError.message }, 500)
+
+        return c.json({ success: true })
+    }
+)
 
 export const posts = app
