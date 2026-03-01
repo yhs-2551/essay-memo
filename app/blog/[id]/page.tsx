@@ -11,7 +11,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
     } = await supabase.auth.getUser()
     if (!user) notFound()
 
-    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
+    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).eq('user_id', user.id).single()
 
     if (error || !data) notFound()
 

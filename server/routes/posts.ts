@@ -63,7 +63,7 @@ app.get('/:id', async (c) => {
         return c.json({ error: 'Unauthorized: Please log in' }, 401)
     }
 
-    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
+    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).eq('user_id', user.id).single()
 
     if (error) return c.json({ error: error.message }, 404)
 

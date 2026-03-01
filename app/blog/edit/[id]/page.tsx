@@ -11,7 +11,7 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
     } = await supabase.auth.getUser()
     if (!user) redirect('/login')
 
-    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).single()
+    const { data, error } = await supabase.from('posts').select('*, consultations(*)').eq('id', id).eq('user_id', user.id).single()
 
     if (error || !data) notFound()
 
